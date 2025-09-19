@@ -12,6 +12,12 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 from tensorflow.keras.applications import MobileNetV3Large
 
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.applications import mobilenet_v2
+from tensorflow.keras import callbacks
+
+
+
 # Global - Paths
 IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
 LABEL_DIR = "/home/leo/Documentos/DeepWeeds-master/labels/"
@@ -21,50 +27,99 @@ LABEL_DIR = "/home/leo/Documentos/DeepWeeds-master/labels/"
 BATCH_SIZE = 32
 IMG_SIZE = (224, 224)
 AUTOTUNE = tf.data.AUTOTUNE
+classes = [0,1,2,3,4,5,6,7,8]
 
 
 data = pd.read_csv(LABEL_DIR + "labels.csv")
 data['Label'] = data["Label"].astype(str)
 data['Filename'] = data['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
+
+"""
+train = pd.read_csv(LABEL_DIR + "train_subset0.csv")
+train['Label'] = train["Label"].astype(str)
+train['Filename'] = train['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
+
+test = pd.read_csv(LABEL_DIR + "test_subset0.csv")
+test['Label'] = test["Label"].astype(str)
+test['Filename'] = test['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
+
+val = pd.read_csv(LABEL_DIR + "test_subset0.csv")
+val['Label'] = val["Label"].astype(str)
+val['Filename'] = val['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
+"""
+
+
 df_train, df_val = train_test_split(data, test_size=0.2, stratify=data['Label'], random_state=42)
 
 
+classes = sorted(data['Label'].unique().tolist())
+#Ou utiliza o backbone ou faz resize
+preprocess_fn = mobilenet_v2.preprocess_input
+
+#Train datagen com augmentation e Split
+"""
+Para utilizar o datagen com augmentation, precisamos splitar o dataframe antes, pois se não o modelo valida com o augmentation.
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    validation_split=0.2
+    preprocessing_function=preprocess_fn,
+    validation_split=0.2,
+    rotation_range=10,
+    width_shift_range=0.05,
+    height_shift_range=0.05,
+    horizontal_flip=True,
+    zoom_range=0.1
+)
+"""
+train_datagen = ImageDataGenerator(
+    preprocessing_function=preprocess_fn,
+    validation_split=0.2,
 )
 
 
 # Gerador para treino
 train_generator = train_datagen.flow_from_dataframe(
-    dataframe=df_train,
+    dataframe=data,
     x_col="Filename",
     y_col="Label",
     target_size=IMG_SIZE,
     batch_size=BATCH_SIZE,
     class_mode="categorical",
     subset="training",
-    shuffle=True
+    shuffle=True,
+    classes=classes,
+    seed=42
 )
+
+
 
 # Gerador para validação
 val_generator = train_datagen.flow_from_dataframe(
-    dataframe=df_val,
+    dataframe=data,
     x_col="Filename",
     y_col="Label",
     target_size=IMG_SIZE,
     batch_size=BATCH_SIZE,
     class_mode="categorical",
     subset="validation",
-    shuffle=False
+    shuffle=False,
+    classes=classes,
+    seed=42
 )
+
+
+# debbug class_indices:
+print(train_generator.class_indices)
+print(val_generator.class_indices)
+assert train_generator.class_indices == val_generator.class_indices
+
+
 
 ##MODEL
 ### MOBILENETV2
 base_model = MobileNetV2(input_shape=IMG_SIZE + (3,), include_top=False, weights='imagenet')
 base_model.trainable = False  # Congela a base inicialmente
+
+##MOBILENETV3
 """
-##MOBILENETV3SMALL
 base_model = MobileNetV3Large(
     input_shape=(224, 224, 3),
     include_top=False,
@@ -72,13 +127,30 @@ base_model = MobileNetV3Large(
 )
 base_model.trainable = False
 """
+
+
 ##Transfer
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
+x = Dropout(0.2)(x)
 x = Dense(128, activation='relu')(x)
-outputs = Dense(9, activation='sigmoid')(x)
+outputs = Dense(len(classes), activation='softmax')(x)
 
 model = Model(inputs=base_model.input, outputs=outputs)
+
+
+###CALLBACKS
+cbs = [
+    callbacks.ModelCheckpoint("best_head.keras", monitor="val_accuracy",
+                              save_best_only=True, mode="max"),
+    callbacks.EarlyStopping(monitor="val_accuracy", patience=8,
+                            restore_best_weights=True, mode="max"),
+    callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
+                                patience=3, min_lr=1e-6),
+]
+#####
+
+
 
 
 model.compile(
@@ -88,13 +160,13 @@ model.compile(
 )
 
 
-
 history = model.fit(
     train_generator,
     validation_data=val_generator,
-    epochs=150)
-
-
+    epochs=150,
+    callbacks=cbs,
+    verbose=1
+)
 
 def plot_history(history, save_path):
     plt.figure(figsize=(12, 5))
