@@ -58,13 +58,12 @@ val_generator = train_datagen.flow_from_dataframe(
     subset="validation",
     shuffle=False
 )
-"""
+
 ##MODEL
 ### MOBILENETV2
 base_model = MobileNetV2(input_shape=IMG_SIZE + (3,), include_top=False, weights='imagenet')
 base_model.trainable = False  # Congela a base inicialmente
 """
-
 ##MOBILENETV3SMALL
 base_model = MobileNetV3Large(
     input_shape=(224, 224, 3),
@@ -72,7 +71,7 @@ base_model = MobileNetV3Large(
     weights='imagenet'
 )
 base_model.trainable = False
-
+"""
 ##Transfer
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
