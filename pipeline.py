@@ -55,7 +55,7 @@ data['Filename'] = data['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
 
 # 1) Split estratificado - Balanceamento das Classes
 df_train, df_val = train_test_split(
-    data, test_size=0.2, stratify=data['Label'], random_state=42
+    data, test_size=0.3, stratify=data['Label'], random_state=42
 )
 
 # 2) Classes consistentes (ordenadas)
@@ -98,7 +98,7 @@ train_datagen = ImageDataGenerator(
     channel_shift_range=25,
     width_shift_range=0.05,
     height_shift_range=0.05,
-    zoom_range=(0.5,1),
+    zoom_range=(0.1,1),
     horizontal_flip=True,
     brightness_range=(0.75, 1.25)
 )
@@ -170,7 +170,7 @@ x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = Dropout(0.2)(x)
 x = Dense(256, activation='relu')(x)
-outputs = Dense(len(classes), activation='softmax', dtype="float32" )(x)
+outputs = Dense(len(classes), activation='sigmoid', dtype="float32" )(x)
 
 model = Model(inputs=base_model.input, outputs=outputs)
 
@@ -207,7 +207,41 @@ history = model.fit(
     validation_data=val_generator,
     epochs=200,
     callbacks=cbs,
-#    class_weight=class_weight,   # <— comente esta linha se não quiser usar
+    class_weight=class_weight,   # <— comente esta linha se não quiser usar
     verbose=1
 )
 
+
+
+#Fine-Tunning
+model.load_weights("best_head.keras")  # garante melhor ponto de partida
+
+unfreeze_from = int(len(base_model.layers) * 0.6)  # ajuste 0.6–0.75 conforme VRAM/estabilidade
+base_model.trainable = True
+for i, L in enumerate(base_model.layers):
+    if i < unfreeze_from:
+        L.trainable = False
+    elif isinstance(L, layers.BatchNormalization):
+        L.trainable = False
+    else:
+        L.trainable = True
+
+# LR bem baixo + (opcional) weight decay
+opt = optimizers.AdamW(learning_rate=1e-5, weight_decay=1e-5)
+
+
+model.compile(optimizer=opt, loss=loss, metrics=["accuracy"])
+
+cbs_ft = [
+    callbacks.ModelCheckpoint("best_v3_finetune.keras", monitor="val_accuracy", mode="max", save_best_only=True),
+    callbacks.EarlyStopping(monitor="val_accuracy", mode="max", patience=10, restore_best_weights=True),
+    callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=4, min_lr=1e-6),
+]
+
+history_ft = model.fit(
+    train_generator,
+    validation_data=val_generator,
+    epochs=100,
+    callbacks=cbs_ft,
+    verbose=1
+)
