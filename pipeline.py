@@ -29,6 +29,9 @@ from tensorflow.keras import mixed_precision
 
 from sklearn.metrics import confusion_matrix, classification_report
 
+
+import plot_training_results
+
 # Mixed Precision - Entra FP16 
 ## Tem que garantir que a saída do modelo é float32
 mixed_precision.set_global_policy("mixed_float16")
@@ -245,3 +248,19 @@ history_ft = model.fit(
     callbacks=cbs_ft,
     verbose=1
 )
+
+
+
+plot_training_curves(history, out_png="curvas_mobilenetv3.png", title="MobileNetV3 - DeepWeeds")
+save_history_csv(history, out_csv="historico_mobilenetv3.csv")
+
+plot_confusion_and_report(
+    model, val_generator, train_generator.class_indices,
+    cm_png="cm_mobilenetv3.png",
+    report_txt="report_mobilenetv3.txt",
+    normalize=True
+)
+
+
+plot_training_curves(history_ft, out_png="curvas_mobilenetv3_finetunning.png", title="MobileNetV3 Tuned- DeepWeeds")
+save_history_csv(history_ft, out_csv="historico_mobilenetv3_finetunning.csv")
