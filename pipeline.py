@@ -17,15 +17,22 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.applications import mobilenet_v2
 from tensorflow.keras import callbacks
 
-
+from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import mobilenet_v2
+from tensorflow.keras.applications import mobilenet_v3
 from tensorflow.keras import callbacks
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 from collections import Counter
 
+from tensorflow.keras import mixed_precision
 
+from sklearn.metrics import confusion_matrix, classification_report
+
+# Mixed Precision - Entra FP16 
+## Tem que garantir que a saída do modelo é float32
+mixed_precision.set_global_policy("mixed_float16")
+print(mixed_precision.global_policy()) 
 
 # Global - Paths
 IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
@@ -38,7 +45,7 @@ IMG_SIZE = (224, 224)
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0,1,2,3,4,5,6,7,8]
 
-
+mixed_precision.set_global_policy("mixed_float16")
 
 
 data = pd.read_csv(LABEL_DIR + "labels.csv")
@@ -46,7 +53,7 @@ data['Label'] = data["Label"].astype(str)
 data['Filename'] = data['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
 
 
-# 1) Split estratificado (você já tem)
+# 1) Split estratificado - Balanceamento das Classes
 df_train, df_val = train_test_split(
     data, test_size=0.2, stratify=data['Label'], random_state=42
 )
@@ -55,9 +62,12 @@ df_train, df_val = train_test_split(
 classes = sorted(data['Label'].unique().tolist())
 
 # 3) Preprocess do backbone (NÃO use rescale junto)
-preprocess_fn = mobilenet_v2.preprocess_input
+#preprocess_fn = mobilenet_v2.preprocess_input
+
+preprocess_fn = mobilenet_v3.preprocess_input
 
 # 4) Dois datagens: augment só no treino
+"""
 train_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_fn,
     rotation_range=10,
@@ -66,6 +76,35 @@ train_datagen = ImageDataGenerator(
     zoom_range=0.1,
     horizontal_flip=True
 )
+
+
+train_data_generator = ImageDataGenerator(
+    rescale=1. / 255,
+    fill_mode="constant",
+    shear_range=0.2,
+    zoom_range=(0.5, 1),
+    horizontal_flip=True,
+    rotation_range=360,
+    channel_shift_range=25,
+    brightness_range=(0.75, 1.25))
+
+"""
+
+train_datagen = ImageDataGenerator(
+    preprocessing_function=preprocess_fn,
+    fill_mode = 'constant',
+    shear_range = 0.2,
+    rotation_range=360,
+    channel_shift_range=25,
+    width_shift_range=0.05,
+    height_shift_range=0.05,
+    zoom_range=(0.5,1),
+    horizontal_flip=True,
+    brightness_range=(0.75, 1.25)
+)
+
+
+
 val_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_fn
 )
@@ -94,13 +133,13 @@ val_generator = val_datagen.flow_from_dataframe(
     shuffle=False
 )
 
-# 6) Sanity checks
+# 6) Valida os índices e classes
 print(train_generator.class_indices)
 print(val_generator.class_indices)
 assert train_generator.class_indices == val_generator.class_indices
 assert set(train_generator.filenames).isdisjoint(set(val_generator.filenames))
 
-# 7) (Opcional) class_weight p/ desbalanceamento
+# 7) class_weight p/ desbalanceamento
 cw = compute_class_weight(
     class_weight='balanced',
     classes=np.arange(len(classes)),
@@ -110,18 +149,28 @@ class_weight = {i: float(w) for i, w in enumerate(cw)}
 print("Distribuição treino:", Counter(train_generator.classes))
 print("Distribuição val   :", Counter(val_generator.classes))
 
-
+"""
 ##MODEL
 ### MOBILENETV2
 base_model = MobileNetV2(input_shape=IMG_SIZE + (3,), include_top=False, weights='imagenet')
 base_model.trainable = False  # Congela a base inicialmente
+]
+"""
 
+base_model = MobileNetV3Large(
+    input_shape=(224, 224, 3),
+    include_top=False,
+    weights='imagenet'
+)
+
+
+base_model.trainable = False
 ##Transfer
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = Dropout(0.2)(x)
-x = Dense(128, activation='relu')(x)
-outputs = Dense(len(classes), activation='softmax')(x)
+x = Dense(256, activation='relu')(x)
+outputs = Dense(len(classes), activation='softmax', dtype="float32" )(x)
 
 model = Model(inputs=base_model.input, outputs=outputs)
 
@@ -133,7 +182,7 @@ model.compile(
     loss='categorical_crossentropy',
     metrics=['accuracy']
 )
-
+"""
 cbs = [
     callbacks.ModelCheckpoint("best_head.keras", monitor="val_accuracy",
                               save_best_only=True, mode="max"),
@@ -142,12 +191,23 @@ cbs = [
     callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
                                 patience=3, min_lr=1e-6),
 ]
+"""
+cbs = [
+    callbacks.ModelCheckpoint("best_head.keras", monitor="val_accuracy",
+                              save_best_only=True, mode="max"),
+    callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
+                                patience=3, min_lr=1e-6),
+    callbacks.CSVLogger("treino_log.csv", append=False),
+    callbacks.TensorBoard(log_dir="tb_logs", histogram_freq=1)
+]
+
 
 history = model.fit(
     train_generator,
     validation_data=val_generator,
-    epochs=60,
+    epochs=200,
     callbacks=cbs,
-    class_weight=class_weight,   # <— comente esta linha se não quiser usar
+#    class_weight=class_weight,   # <— comente esta linha se não quiser usar
     verbose=1
 )
+
