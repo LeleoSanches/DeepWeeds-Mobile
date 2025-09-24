@@ -25,6 +25,8 @@ from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 from collections import Counter
 
+from tensorflow.keras import layers, Model, callbacks, optimizers
+
 from tensorflow.keras import mixed_precision
 
 from sklearn.metrics import confusion_matrix, classification_report
@@ -58,7 +60,7 @@ data['Filename'] = data['Filename'].apply(lambda x: os.path.join(IMG_DIR, x))
 
 # 1) Split estratificado - Balanceamento das Classes
 df_train, df_val = train_test_split(
-    data, test_size=0.3, stratify=data['Label'], random_state=42
+    data, test_size=0.25, stratify=data['Label'], random_state=75
 )
 
 # 2) Classes consistentes (ordenadas)
@@ -122,7 +124,7 @@ train_generator = train_datagen.flow_from_dataframe(
     class_mode="categorical",
     classes=classes,
     shuffle=True,
-    seed=42
+    seed=122
 )
 
 val_generator = val_datagen.flow_from_dataframe(
@@ -200,6 +202,8 @@ cbs = [
                               save_best_only=True, mode="max"),
     callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
                                 patience=3, min_lr=1e-6),
+    callbacks.EarlyStopping(monitor="val_accuracy", patience=16,
+                            restore_best_weights=True, mode="max"),
     callbacks.CSVLogger("treino_log.csv", append=False),
     callbacks.TensorBoard(log_dir="tb_logs", histogram_freq=1)
 ]
@@ -210,7 +214,7 @@ history = model.fit(
     validation_data=val_generator,
     epochs=200,
     callbacks=cbs,
-    class_weight=class_weight,   # <— comente esta linha se não quiser usar
+#    class_weight=class_weight,   # <— comente esta linha se não quiser usar
     verbose=1
 )
 
@@ -233,7 +237,7 @@ for i, L in enumerate(base_model.layers):
 opt = optimizers.AdamW(learning_rate=1e-5, weight_decay=1e-5)
 
 
-model.compile(optimizer=opt, loss=loss, metrics=["accuracy"])
+model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=["accuracy"])
 
 cbs_ft = [
     callbacks.ModelCheckpoint("best_v3_finetune.keras", monitor="val_accuracy", mode="max", save_best_only=True),
@@ -248,6 +252,111 @@ history_ft = model.fit(
     callbacks=cbs_ft,
     verbose=1
 )
+
+
+
+######
+print('iniciando Plotting Results')
+
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report
+
+def plot_training_curves(history, out_png="curvas_treinamento.png", title="Treinamento"):
+    """Plota e salva acurácia e loss (treino/val)."""
+    hist = history.history
+    epochs = range(1, len(hist["accuracy"]) + 1)
+
+    plt.figure(figsize=(12,5))
+
+    # Acurácia
+    plt.subplot(1,2,1)
+    plt.plot(epochs, hist["accuracy"], label="Treino")
+    plt.plot(epochs, hist["val_accuracy"], label="Validação")
+    plt.title("Acurácia")
+    plt.xlabel("Época"); plt.ylabel("Acurácia")
+    plt.legend(); plt.grid(True, alpha=0.3)
+
+    # Loss
+    plt.subplot(1,2,2)
+    plt.plot(epochs, hist["loss"], label="Treino")
+    plt.plot(epochs, hist["val_loss"], label="Validação")
+    plt.title("Loss")
+    plt.xlabel("Época"); plt.ylabel("Loss")
+    plt.legend(); plt.grid(True, alpha=0.3)
+
+    plt.suptitle(title)
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=150, bbox_inches="tight")
+    print(f"[OK] Curvas salvas em: {out_png}")
+    plt.close()
+
+def save_history_csv(history, out_csv="historico_treinamento.csv"):
+    """Salva o histórico completo em CSV."""
+    df = pd.DataFrame(history.history)
+    df.to_csv(out_csv, index=False)
+    print(f"[OK] Histórico salvo em: {out_csv}")
+
+def plot_confusion_and_report(model, val_generator, class_indices,
+                              cm_png="matriz_confusao.png", report_txt="relatorio_classificacao.txt",
+                              normalize=True):
+    """Gera preds no conjunto de validação, plota matriz de confusão e salva relatório."""
+    # Verdadeiros e predições
+    y_true = val_generator.classes
+    probs = model.predict(val_generator, verbose=0)
+    y_pred = probs.argmax(axis=1)
+
+    # Nomes de classes na ordem correta
+    inv_map = {v: k for k, v in class_indices.items()}
+    class_names = [inv_map[i] for i in range(len(inv_map))]
+
+    # Matriz de confusão
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(class_names)))
+    if normalize:
+        cm = cm.astype("float") / cm.sum(axis=1, keepdims=True)
+        cm = np.nan_to_num(cm)  # evita NaN se alguma classe não aparece
+
+    # Plot
+    plt.figure(figsize=(8,7))
+    im = plt.imshow(cm, interpolation="nearest")
+    plt.title("Matriz de Confusão" + (" (normalizada)" if normalize else ""))
+    plt.colorbar(im, fraction=0.046, pad=0.04)
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names, rotation=45, ha="right")
+    plt.yticks(tick_marks, class_names)
+
+    # Anotações
+    fmt = ".2f" if normalize else "d"
+    thresh = cm.max() / 2. if cm.max() > 0 else 0.5
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, format(cm[i, j], fmt),
+                     ha="center", va="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.ylabel("Verdadeiro")
+    plt.xlabel("Predito")
+    plt.tight_layout()
+    plt.savefig(cm_png, dpi=150, bbox_inches="tight")
+    print(f"[OK] Matriz de confusão salva em: {cm_png}")
+    plt.close()
+
+    # Relatório por classe
+    report = classification_report(y_true, y_pred, target_names=class_names, digits=4)
+    with open(report_txt, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(f"[OK] Relatório salvo em: {report_txt}")
+    # Também imprime no console
+    print(report)
+
+
+
+
+
+
 
 
 
