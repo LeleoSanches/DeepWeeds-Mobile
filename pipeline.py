@@ -1,38 +1,36 @@
-
+import os
 import tensorflow as tf
 import pandas as pd
-from tensorflow.keras.applications import MobileNetV2
+import numpy as np
+import matplotlib.pyplot as plt
+
+from collections import Counter
+
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras import layers, Model, callbacks, optimizers
+from tensorflow.keras import mixed_precision
+
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from tensorflow.keras.utils import image_dataset_from_directory
-import os
-from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-import matplotlib.pyplot as plt
-from tensorflow.keras.applications import MobileNetV3Large
 
-from tensorflow.keras.layers import Dropout
+#Models and Backbone
+from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.applications import mobilenet_v2
-from tensorflow.keras import callbacks
-
-from tensorflow.keras.applications import MobileNetV3Large
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications import mobilenet_v3
-from tensorflow.keras import callbacks
+
+#Utils
+from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
-import numpy as np
-from collections import Counter
-
-from tensorflow.keras import layers, Model, callbacks, optimizers
-
-from tensorflow.keras import mixed_precision
-
 from sklearn.metrics import confusion_matrix, classification_report
-
-
 import plot_training_results
+
+
+
 
 # Mixed Precision - Entra FP16 
 ## Tem que garantir que a saída do modelo é float32
@@ -258,12 +256,6 @@ history_ft = model.fit(
 ######
 print('iniciando Plotting Results')
 
-
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, classification_report
 
 def plot_training_curves(history, out_png="curvas_treinamento.png", title="Treinamento"):
     """Plota e salva acurácia e loss (treino/val)."""
