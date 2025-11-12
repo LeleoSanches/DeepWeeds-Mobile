@@ -38,7 +38,8 @@ print(mixed_precision.global_policy())
 # Global - Paths
 IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
 LABEL_DIR = "/home/leo/Documentos/DeepWeeds-master/labels/"
-
+RESULTS_DIR = "/home/leo/Documentos/DeepWeeds-master/results/"
+MODELS_DIR = "/home/leo/Documentos/DeepWeeds-master/models/"
 
 # Global - Parâmetros
 BATCH_SIZE = 32
@@ -65,31 +66,30 @@ classes = sorted(data['Label'].unique().tolist())
 # 3) Preprocess do backbone (NÃO use rescale junto)
 #preprocess_fn = mobilenet_v2.preprocess_input
 
-preprocess_fn = mobilenet_v3.preprocess_input
+#preprocess_fn = mobilenet_v3.preprocess_input
+
+def get_backbone(name: str, img_size):
+    h, w = img_size
+    input_shape = (h, w, 3)
+    name = name.lower()
+    if name == "mobilenetv2":
+        preprocess_fn = mobilenet_v2.preprocess_input
+        base_model = mobilenet_v2.MobileNetV2(input_shape=input_shape, include_top=False, weights="imagenet")
+    elif name == "mobilenetv3large":
+        preprocess_fn = mobilenet_v3.preprocess_input
+        base_model = mobilenet_v3.MobileNetV3Large(input_shape=input_shape, include_top=False, weights="imagenet")
+    elif name == "mobilenetv3small":
+        preprocess_fn = mobilenet_v3.preprocess_input
+        base_model = mobilenet_v3.MobileNetV3Small(input_shape=input_shape, include_top=False, weights="imagenet")
+    else:
+        raise ValueError("--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small")
+    base_model =  False
+    return preprocess_fn, base_model
+
+preprocess_fn, base_model = get_backbone(name="mobilenetv2", img_size=IMG_SIZE)
 
 # 4) Dois datagens: augment só no treino
-"""
-train_datagen = ImageDataGenerator(
-    preprocessing_function=preprocess_fn,
-    rotation_range=10,
-    width_shift_range=0.05,
-    height_shift_range=0.05,
-    zoom_range=0.1,
-    horizontal_flip=True
-)
 
-
-train_data_generator = ImageDataGenerator(
-    rescale=1. / 255,
-    fill_mode="constant",
-    shear_range=0.2,
-    zoom_range=(0.5, 1),
-    horizontal_flip=True,
-    rotation_range=360,
-    channel_shift_range=25,
-    brightness_range=(0.75, 1.25))
-
-"""
 
 train_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_fn,
@@ -150,20 +150,19 @@ class_weight = {i: float(w) for i, w in enumerate(cw)}
 print("Distribuição treino:", Counter(train_generator.classes))
 print("Distribuição val   :", Counter(val_generator.classes))
 
-"""
 ##MODEL
 ### MOBILENETV2
 base_model = MobileNetV2(input_shape=IMG_SIZE + (3,), include_top=False, weights='imagenet')
-base_model.trainable = False  # Congela a base inicialmente
-]
-"""
+#base_model.trainable = False  # Congela a base inicialmente
 
+
+"""
 base_model = MobileNetV3Large(
     input_shape=(224, 224, 3),
     include_top=False,
     weights='imagenet'
 )
-
+"""
 
 base_model.trainable = False
 ##Transfer
