@@ -14,7 +14,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras import layers, Model, callbacks, optimizers
 from tensorflow.keras import mixed_precision
-
+from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from tensorflow.keras.utils import image_dataset_from_directory
@@ -27,7 +27,7 @@ from tensorflow.keras.applications import MobileNetV3Large, MobileNetV3Small, Mo
 from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3
 from tensorflow.keras.applications import efficientnet
 from tensorflow.keras.applications import EfficientNetV2B0, EfficientNetV2B1, EfficientNetV2B2, EfficientNetV2B3
-from tensorflow.keras.applications.efficientnet_v2 import preprocess_input
+from tensorflow.keras.applications import efficientnet_v2
 
 #Utils
 from sklearn.model_selection import train_test_split
@@ -41,6 +41,7 @@ from plot_training_results import utils
 mixed_precision.set_global_policy("mixed_float16")
 print(mixed_precision.global_policy()) 
 print("Keras version:", keras.__version__)
+K.set_image_data_format('channels_last')
 
 # Global - Paths
 IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
@@ -52,6 +53,15 @@ MODELS_DIR = "/home/leo/Documentos/DeepWeeds-master/models/"
 MODEL_NAME = "mobilenetv2"
 BATCH_SIZE = 32
 IMG_SIZE = (224, 224)
+DEFAULT_IMG_SIZE = {
+    "mobilenetv2":      224,
+    "mobilenetv3large": 224,
+    "mobilenetv3small": 224,
+    "efficientnetv2b0": 224,
+    "efficientnetv2b1": 240,
+    "efficientnetv2b2": 260,
+    "efficientnetv2b3": 300,
+}
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0,1,2,3,4,5,6,7,8]
 
@@ -109,6 +119,7 @@ def load_split_data(label_dir: str, test_size: float):
 def get_backbone(name: str, img_size):
     h, w = img_size
     input_shape = (h, w, 3)
+    print(f"[DEBBUG] Input Shape Backbone: {input_shape}")
     name = name.lower()
     if name == "mobilenetv2":
         preprocess_fn = mobilenet_v2.preprocess_input
@@ -119,21 +130,6 @@ def get_backbone(name: str, img_size):
     elif name == "mobilenetv3small":
         preprocess_fn = mobilenet_v3.preprocess_input
         base_model = MobileNetV3Small(input_shape=input_shape, include_top=False, weights="imagenet")
-
-    elif name == "efficientnetb0":
-        preprocess_fn = efficientnet.preprocess_input
-        base_model = EfficientNetB0(input_shape=input_shape, include_top=False, weights="imagenet")
-    elif name == "efficientnetb1":
-        preprocess_fn = efficientnet.preprocess_input
-        base_model = EfficientNetB1(input_shape=input_shape, include_top=False, weights="imagenet")
-
-    elif name == "efficientnetb2":
-        preprocess_fn = efficientnet.preprocess_input
-        base_model = EfficientNetB2(input_shape=input_shape, include_top=False, weights="imagenet")
-
-    elif name == "efficientnetb3":
-        preprocess_fn = efficientnet.preprocess_input
-        base_model = EfficientNetB3(input_shape=input_shape, include_top=False, weights="imagenet")
 
     # -------- EfficientNet V2 --------
     elif name == "efficientnetv2b0":
@@ -154,13 +150,13 @@ def get_backbone(name: str, img_size):
 
     else:
         raise ValueError("--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small, "
-                         "efficientnetb0/b1/b2/b3, efficientnetv2b0/b1/b2/b3")
+                         "efficientnetv2b0/b1/b2/b3")
 
     return preprocess_fn, base_model
 
 
-# 4) Dois datagens: augment só no treino
-def set_generators(preprocess_fn, df_train, df_val, debbug: bool):
+# 4) Dois datagens - augment só no treino
+def set_generators(preprocess_fn, df_train, df_val,img_size ,debbug: bool):
     
     #Augmentation
     train_datagen = ImageDataGenerator(
@@ -185,7 +181,7 @@ def set_generators(preprocess_fn, df_train, df_val, debbug: bool):
         dataframe=df_train,
         x_col="Filename",
         y_col="Label",
-        target_size=IMG_SIZE,
+        target_size=img_size,
         batch_size=BATCH_SIZE,
         class_mode="categorical",
         classes=classes,
@@ -197,7 +193,7 @@ def set_generators(preprocess_fn, df_train, df_val, debbug: bool):
         dataframe=df_val,
         x_col="Filename",
         y_col="Label",
-        target_size=IMG_SIZE,
+        target_size=img_size,
         batch_size=BATCH_SIZE,
         class_mode="categorical",
         classes=classes,
@@ -318,6 +314,14 @@ def fit_finetunning(model,train_generator, val_generator, epochs: int ,name:str)
     )
     return history_ft
 
+#Ajusta img_size pelo modelo
+def auto_img_size(model_name):
+    FALLBACK_IMG_SIZE = 224
+    s = DEFAULT_IMG_SIZE.get(model_name.lower(), FALLBACK_IMG_SIZE)
+    print(f"[INFO] Ajustando IMG_SIZE para {s}x{s} para {model_name}")
+    return (s, s)
+
+
 
 if __name__ == "__main__":
     parser = build_argparser()
@@ -325,11 +329,13 @@ if __name__ == "__main__":
     MODEL_NAME = str(args.model) 
 
     print(f"[INFO] Modelo selecionado: {MODEL_NAME}")
+    IMG_SIZE = auto_img_size(MODEL_NAME)
+    print(f"[INFO] IMG_SIZE De {MODEL_NAME} Ajustado para: {IMG_SIZE}")
 
     #Training
     df_train, df_val, classes = load_split_data(label_dir = LABEL_DIR, test_size=0.2)
     preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
-    train_generator, val_generator = set_generators(preprocess_fn, df_train, df_val, debbug=True)
+    train_generator, val_generator = set_generators(preprocess_fn, df_train, df_val,IMG_SIZE ,debbug=True)
     model = set_transferlearning(base_model)
     history = fit_model(model, train_generator, val_generator, name = MODEL_NAME,class_weight=False,epochs=10 )
     model = set_finetunning(model)
