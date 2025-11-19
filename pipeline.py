@@ -25,7 +25,7 @@ from tensorflow.keras.applications import mobilenet_v2
 from tensorflow.keras.applications import mobilenet_v3
 from tensorflow.keras.applications import MobileNetV3Large, MobileNetV3Small, MobileNetV2
 from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3
-from tensorflow.keras.applications.efficientnet import preprocess_input
+from tensorflow.keras.applications import efficientnet
 from tensorflow.keras.applications import EfficientNetV2B0, EfficientNetV2B1, EfficientNetV2B2, EfficientNetV2B3
 from tensorflow.keras.applications.efficientnet_v2 import preprocess_input
 
@@ -119,8 +119,43 @@ def get_backbone(name: str, img_size):
     elif name == "mobilenetv3small":
         preprocess_fn = mobilenet_v3.preprocess_input
         base_model = MobileNetV3Small(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetb0":
+        preprocess_fn = efficientnet.preprocess_input
+        base_model = EfficientNetB0(input_shape=input_shape, include_top=False, weights="imagenet")
+    elif name == "efficientnetb1":
+        preprocess_fn = efficientnet.preprocess_input
+        base_model = EfficientNetB1(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetb2":
+        preprocess_fn = efficientnet.preprocess_input
+        base_model = EfficientNetB2(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetb3":
+        preprocess_fn = efficientnet.preprocess_input
+        base_model = EfficientNetB3(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    # -------- EfficientNet V2 --------
+    elif name == "efficientnetv2b0":
+        preprocess_fn = efficientnet_v2.preprocess_input
+        base_model = EfficientNetV2B0(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetv2b1":
+        preprocess_fn = efficientnet_v2.preprocess_input
+        base_model = EfficientNetV2B1(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetv2b2":
+        preprocess_fn = efficientnet_v2.preprocess_input
+        base_model = EfficientNetV2B2(input_shape=input_shape, include_top=False, weights="imagenet")
+
+    elif name == "efficientnetv2b3":
+        preprocess_fn = efficientnet_v2.preprocess_input
+        base_model = EfficientNetV2B3(input_shape=input_shape, include_top=False, weights="imagenet")
+
     else:
-        raise ValueError("--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small")
+        raise ValueError("--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small, "
+                         "efficientnetb0/b1/b2/b3, efficientnetv2b0/b1/b2/b3")
+
     return preprocess_fn, base_model
 
 
