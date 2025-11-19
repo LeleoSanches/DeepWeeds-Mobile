@@ -3,8 +3,11 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
 from collections import Counter
+
+import tensorflow as tf, keras
 
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
@@ -18,10 +21,13 @@ from tensorflow.keras.utils import image_dataset_from_directory
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 #Models and Backbone's
-from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.applications import mobilenet_v2
-from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications import mobilenet_v3
+from tensorflow.keras.applications import MobileNetV3Large, MobileNetV3Small, MobileNetV2
+from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3
+from tensorflow.keras.applications.efficientnet import preprocess_input
+from tensorflow.keras.applications import EfficientNetV2B0, EfficientNetV2B1, EfficientNetV2B2, EfficientNetV2B3
+from tensorflow.keras.applications.efficientnet_v2 import preprocess_input
 
 #Utils
 from sklearn.model_selection import train_test_split
@@ -34,6 +40,7 @@ from plot_training_results import utils
 ## Tem que garantir que a saída do modelo é float32
 mixed_precision.set_global_policy("mixed_float16")
 print(mixed_precision.global_policy()) 
+print("Keras version:", keras.__version__)
 
 # Global - Paths
 IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
@@ -42,14 +49,29 @@ RESULTS_DIR = "/home/leo/Documentos/DeepWeeds-master/results/"
 MODELS_DIR = "/home/leo/Documentos/DeepWeeds-master/models/"
 
 # Global - Parâmetros
-MODEL_NAME = "MobilenetVg2"
+MODEL_NAME = "mobilenetv2"
 BATCH_SIZE = 32
 IMG_SIZE = (224, 224)
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0,1,2,3,4,5,6,7,8]
 
-mixed_precision.set_global_policy("mixed_float16")
+#Global
+SUPPORTED_MODELS = ["mobilenetv2", "mobilenetv3large", "mobilenetv3small", "efficientnetb0", "efficientnetb1", "efficientnetb2", "efficientnetb3",
+    "efficientnetv2b0", "efficientnetv2b1", "efficientnetv2b2", "efficientnetv2b3"]
 
+
+def build_argparser():
+    parser = argparse.ArgumentParser(
+        description="Treino DeepWeeds com modelos mobile (transfer learning)",
+        epilog=f"Modelos suportados: {', '.join(SUPPORTED_MODELS)}"
+    )
+    parser.add_argument(
+        "--model", "-m",
+        default="mobilenetv3large",
+        choices=SUPPORTED_MODELS,
+        help="Backbone a utilizar. Opções: %(choices)s (padrão: %(default)s)"
+    )
+    return parser
 
 
 def load_split_data(label_dir: str, test_size: float):
@@ -90,13 +112,13 @@ def get_backbone(name: str, img_size):
     name = name.lower()
     if name == "mobilenetv2":
         preprocess_fn = mobilenet_v2.preprocess_input
-        base_model = mobilenet_v2.MobileNetV2(input_shape=input_shape, include_top=False, weights="imagenet")
+        base_model = MobileNetV2(input_shape=input_shape, include_top=False, weights="imagenet")
     elif name == "mobilenetv3large":
         preprocess_fn = mobilenet_v3.preprocess_input
-        base_model = mobilenet_v3.MobileNetV3Large(input_shape=input_shape, include_top=False, weights="imagenet")
+        base_model = MobileNetV3Large(input_shape=input_shape, include_top=False, weights="imagenet")
     elif name == "mobilenetv3small":
         preprocess_fn = mobilenet_v3.preprocess_input
-        base_model = mobilenet_v3.MobileNetV3Small(input_shape=input_shape, include_top=False, weights="imagenet")
+        base_model = MobileNetV3Small(input_shape=input_shape, include_top=False, weights="imagenet")
     else:
         raise ValueError("--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small")
     return preprocess_fn, base_model
@@ -245,7 +267,7 @@ def set_finetunning(model):
 
     return model
 
-def fit_finetunning(model,train_generator, val_generator, name:str):
+def fit_finetunning(model,train_generator, val_generator, epochs: int ,name:str):
     cbs_ft = [
         callbacks.ModelCheckpoint(f"best_{name}_finetune.keras", monitor="val_accuracy", mode="max", save_best_only=True),
         callbacks.EarlyStopping(monitor="val_accuracy", mode="max", patience=20, restore_best_weights=True),
@@ -255,52 +277,49 @@ def fit_finetunning(model,train_generator, val_generator, name:str):
     history_ft = model.fit(
         train_generator,
         validation_data=val_generator,
-        epochs=100,
+        epochs=epochs,
         callbacks=cbs_ft,
         verbose=1
     )
     return history_ft
 
 
-df_train, df_val, classes = load_split_data(label_dir = LABEL_DIR, test_size=0.2)
-preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
-train_generator, val_generator = set_generators(preprocess_fn, df_train, df_val, debbug=True)
-model = set_transferlearning(base_model)
-history = fit_model(model, train_generator, val_generator, name = MODEL_NAME,class_weight=False,epochs=300 )
-model = set_finetunning(model)
-history_ft = fit_finetunning(model, train_generator, val_generator)
+if __name__ == "__main__":
+    parser = build_argparser()
+    args = parser.parse_args()
+    MODEL_NAME = str(args.model) 
+
+    print(f"[INFO] Modelo selecionado: {MODEL_NAME}")
+
+    #Training
+    df_train, df_val, classes = load_split_data(label_dir = LABEL_DIR, test_size=0.2)
+    preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
+    train_generator, val_generator = set_generators(preprocess_fn, df_train, df_val, debbug=True)
+    model = set_transferlearning(base_model)
+    history = fit_model(model, train_generator, val_generator, name = MODEL_NAME,class_weight=False,epochs=10 )
+    model = set_finetunning(model)
+    history_ft = fit_finetunning(model, train_generator, val_generator,epochs = 5 ,name = MODEL_NAME)
 
 
-######
-print('iniciando Plotting Results')
+    #Plotting
+    print('iniciando Plotting Results')
+    plots = utils()
 
-
-
-plots = utils()
-
-
-plots.plot_training_curves(history, out_png=f"curvas_{MODEL_NAME}.png", title="MobileNetV3 - DeepWeeds")
-plots.save_history_csv(history, out_csv=f"historico_{MODEL_NAME}.csv")
-
-plots.plot_confusion_and_report(
-    model, val_generator, train_generator.class_indices,
-    cm_png=f"cm_{MODEL_NAME}.png",
-    report_txt=f"report_{MODEL_NAME}.txt",
-    normalize=True
-)
-
-
-plots.plot_training_curves(history_ft, out_png=f"curvas_{MODEL_NAME}_finetunning.png", title=f"{MODEL_NAME} Tuned- DeepWeeds")
-plots.save_history_csv(history_ft, out_csv=f"historico_{MODEL_NAME}_finetunning.csv")
-
-
-joined_dict, df_hist = plots.concat_histories(history, history_ft)
-df_hist.to_csv(f"historico_{MODEL_NAME}_joined.csv", index=False)
-
-# split_epoch = número de épocas da fase head (ex.: len(history_head.history["accuracy"]))
-split_epoch = len(history.history.get("accuracy", []))
-plots.plot_history_joined(joined_dict, out_png=f"{MODEL_NAME}_head_plus_ft.png",
-                    title=f"{MODEL_NAME} - DeepWeeds (Head + FT)",
-                    split_epoch=split_epoch)
+    plots.plot_training_curves(history, out_png=f"curvas_{MODEL_NAME}.png", title="MobileNetV3 - DeepWeeds")
+    plots.save_history_csv(history, out_csv=f"historico_{MODEL_NAME}.csv")
+    plots.plot_confusion_and_report(
+        model, val_generator, train_generator.class_indices,
+        cm_png=f"cm_{MODEL_NAME}.png",
+        report_txt=f"report_{MODEL_NAME}.txt",
+        normalize=True
+    )
+    plots.plot_training_curves(history_ft, out_png=f"curvas_{MODEL_NAME}_finetunning.png", title=f"{MODEL_NAME} Tuned- DeepWeeds")
+    plots.save_history_csv(history_ft, out_csv=f"historico_{MODEL_NAME}_finetunning.csv")
+    joined_dict, df_hist = plots.concat_histories(history, history_ft)
+    df_hist.to_csv(f"historico_{MODEL_NAME}_joined.csv", index=False)
+    split_epoch = len(history.history.get("accuracy", []))
+    plots.plot_history_joined(joined_dict, out_png=f"{MODEL_NAME}_head_plus_ft.png",
+                        title=f"{MODEL_NAME} - DeepWeeds (Head + FT)",
+                        split_epoch=split_epoch)
 
 
