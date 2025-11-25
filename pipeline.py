@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+from pathlib import Path
 
 from collections import Counter
 
@@ -43,11 +44,21 @@ print(mixed_precision.global_policy())
 print("Keras version:", keras.__version__)
 K.set_image_data_format('channels_last')
 
-# Global - Paths
-IMG_DIR = "/home/leo/Documentos/DeepWeeds-master/images/"
-LABEL_DIR = "/home/leo/Documentos/DeepWeeds-master/labels/"
-RESULTS_DIR = "/home/leo/Documentos/DeepWeeds-master/results/"
-MODELS_DIR = "/home/leo/Documentos/DeepWeeds-master/models/"
+
+BASE_DIR = Path(__file__).resolve().parent
+IMG_DIR = BASE_DIR / "images"
+RESULTS_DIR = BASE_DIR / "results"
+MODELS_DIR = BASE_DIR / "models"
+LABELS_DIR = BASE_DIR / "labels"
+
+if not IMG_DIR.exists():
+    raise FileNotFoundError(
+        f"A pasta de imagens não foi encontrada em: {IMG_DIR} \n"
+        f"Crie a pasta com as imagens do Deepweeds"
+    )
+
+for directory in [RESULTS_DIR, MODELS_DIR]:
+    directory.mkdir(parents=True, exist_ok=True)
 
 # Global - Parâmetros
 MODEL_NAME = "mobilenetv2"
