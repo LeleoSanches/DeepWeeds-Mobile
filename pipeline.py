@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 from pathlib import Path
+from paths import get_project_dirs
 
 from collections import Counter
 
@@ -45,21 +46,15 @@ print("Keras version:", keras.__version__)
 K.set_image_data_format('channels_last')
 
 
-BASE_DIR = Path(__file__).resolve().parent
-IMG_DIR = BASE_DIR / "images"
-RESULTS_DIR = BASE_DIR / "results"
-MODELS_DIR = BASE_DIR / "models"
-LABELS_DIR = BASE_DIR / "labels"
+DIRS = get_project_dirs()
 
-if not IMG_DIR.exists():
-    raise FileNotFoundError(
-        f"A pasta de imagens não foi encontrada em: {IMG_DIR} \n"
-        f"Crie a pasta com as imagens do Deepweeds"
-    )
+IMG_DIR     = str(DIRS["images"]) + "/"
+RESULTS_DIR = str(DIRS["results"])+ "/"
+MODELS_DIR  = str(DIRS["models"]) + "/"
+LABEL_DIR   = str(DIRS["labels"]) + "/"
 
-for directory in [RESULTS_DIR, MODELS_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
 
+print(LABEL_DIR)
 # Global - Parâmetros
 MODEL_NAME = "mobilenetv2"
 BATCH_SIZE = 32
@@ -80,8 +75,9 @@ FINETUNNING_EPOCHS = 100
 TEST_SIZE = 0.2
 
 #Global
-SUPPORTED_MODELS = ["mobilenetv2", "mobilenetv3large", "mobilenetv3small", "efficientnetb0", "efficientnetb1", "efficientnetb2", "efficientnetb3",
-    "efficientnetv2b0", "efficientnetv2b1", "efficientnetv2b2", "efficientnetv2b3"]
+SUPPORTED_MODELS = ["mobilenetv2", "mobilenetv3large", "mobilenetv3small",
+                    "efficientnetv2b0", "efficientnetv2b1", "efficientnetv2b2",
+                      "efficientnetv2b3"]
 
 
 def build_argparser():
