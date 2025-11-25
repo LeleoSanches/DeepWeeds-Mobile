@@ -1,0 +1,25 @@
+
+#Nao ignora
+!*.py
+!README.md
+!*/
+!results/**
+
+
+#Ignora
+__pycache__/
+.vscode/
+.idea/
+*.log
+.ipynb_checkpoints
+tb_logs/
+*.keras
+*.h5
+*.hdf5
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.csv
+*.txt
+models/
