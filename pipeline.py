@@ -64,6 +64,9 @@ DEFAULT_IMG_SIZE = {
 }
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0,1,2,3,4,5,6,7,8]
+TRAINING_EPOCHS = 200
+FINETUNNING_EPOCHS = 100
+TEST_SIZE = 0.2
 
 #Global
 SUPPORTED_MODELS = ["mobilenetv2", "mobilenetv3large", "mobilenetv3small", "efficientnetb0", "efficientnetb1", "efficientnetb2", "efficientnetb3",
@@ -333,13 +336,13 @@ if __name__ == "__main__":
     print(f"[INFO] IMG_SIZE De {MODEL_NAME} Ajustado para: {IMG_SIZE}")
 
     #Training
-    df_train, df_val, classes = load_split_data(label_dir = LABEL_DIR, test_size=0.2)
+    df_train, df_val, classes = load_split_data(label_dir = LABEL_DIR, test_size=TEST_SIZE)
     preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
     train_generator, val_generator = set_generators(preprocess_fn, df_train, df_val,IMG_SIZE ,debbug=True)
     model = set_transferlearning(base_model)
-    history = fit_model(model, train_generator, val_generator, name = MODEL_NAME,class_weight=False,epochs=10 )
+    history = fit_model(model, train_generator, val_generator, name = MODEL_NAME,class_weight=False,epochs=TRAINING_EPOCHS )
     model = set_finetunning(model)
-    history_ft = fit_finetunning(model, train_generator, val_generator,epochs = 5 ,name = MODEL_NAME)
+    history_ft = fit_finetunning(model, train_generator, val_generator,epochs = FINETUNNING_EPOCHS ,name = MODEL_NAME)
 
 
     #Plotting
