@@ -54,11 +54,12 @@ from plot_training_results import utils
 
 # Mixed Precision - Entra FP16
 ## Tem que garantir que a saída do modelo é float32
-mixed_precision.set_global_policy("mixed_float16")
-print(mixed_precision.global_policy())
-print("Keras version:", keras.__version__)
-K.set_image_data_format("channels_last")
-
+# mixed_precision.set_global_policy("mixed_float16")
+# print(mixed_precision.global_policy())
+# print("Keras version:", keras.__version__)
+# K.set_image_data_format("channels_last")
+print("TF:", tf.__version__)
+print("GPUs visíveis:", tf.config.list_physical_devices("GPU"))
 
 DIRS = get_project_dirs()
 
