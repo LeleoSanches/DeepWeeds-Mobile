@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 from pathlib import Path
 from paths import get_project_dirs
+from plot_training_results import utils
 
 from collections import Counter
 
@@ -30,12 +31,7 @@ from tensorflow.keras.applications import (
     MobileNetV3Small,
     MobileNetV2,
 )
-from tensorflow.keras.applications import (
-    EfficientNetB0,
-    EfficientNetB1,
-    EfficientNetB2,
-    EfficientNetB3,
-)
+
 from tensorflow.keras.applications import efficientnet
 from tensorflow.keras.applications import (
     EfficientNetV2B0,
@@ -50,7 +46,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import confusion_matrix, classification_report
 
-from plot_training_results import utils
 
 # Mixed Precision - Entra FP16
 ## Tem que garantir que a saída do modelo é float32
