@@ -16,10 +16,10 @@ tb_logs/
 *.keras
 *.h5
 *.hdf5
-*.png
-*.jpg
-*.jpeg
+#*.png
+#*.jpg
+#*.jpeg
 *.tif
-*.csv
+#*.csv
 *.txt
 models/
