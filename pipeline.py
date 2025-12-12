@@ -26,10 +26,13 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 # Models and Backbone's
 from tensorflow.keras.applications import mobilenet_v2
 from tensorflow.keras.applications import mobilenet_v3
+from tensorflow.keras.applications import resnet, resnet_v2
 from tensorflow.keras.applications import (
     MobileNetV3Large,
     MobileNetV3Small,
     MobileNetV2,
+    ResNet50,
+    ResNet101V2,
 )
 
 from tensorflow.keras.applications import efficientnet
@@ -76,6 +79,8 @@ DEFAULT_IMG_SIZE = {
     "efficientnetv2b1": 240,
     "efficientnetv2b2": 260,
     "efficientnetv2b3": 300,
+    "resnet50": 224,
+    "resnet101v2": 224,
 }
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
@@ -92,6 +97,8 @@ SUPPORTED_MODELS = [
     "efficientnetv2b1",
     "efficientnetv2b2",
     "efficientnetv2b3",
+    "resnet50",
+    "resnet101v2",
 ]
 
 
@@ -190,7 +197,17 @@ def get_backbone(name: str, img_size):
         base_model = EfficientNetV2B3(
             input_shape=input_shape, include_top=False, weights="imagenet"
         )
-
+    # -------- ResNet --------
+    elif name == "resnet50":
+        preprocess_fn = resnet.preprocess_input
+        base_model = ResNet50(
+            input_shape=input_shape, include_top=False, weights="imagenet"
+        )
+    elif name == "resnet101v2":
+        preprocess_fn = resnet_v2.preprocess_input
+        base_model = ResNet101V2(
+            input_shape=input_shape, include_top=False, weights="imagenet"
+        )
     else:
         raise ValueError(
             "--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small, "
