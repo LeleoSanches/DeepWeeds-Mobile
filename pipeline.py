@@ -119,7 +119,7 @@ def load_split_data(label_dir: str, test_size: float):
 
     except FileNotFoundError as e:
         print(
-            f"[ERRO] labels.csv não encontrado: {csv_path} "
+            f"[ERRO] labels.csv não encontrado: {LABEL_DIR} "
             f"(verifique se 'label_dir' está correto)."
         )
         raise
@@ -263,7 +263,7 @@ def set_transferlearning(base_model):
     x = GlobalAveragePooling2D()(x)
     x = Dropout(0.2)(x)
     x = Dense(256, activation="relu")(x)
-    outputs = Dense(len(classes), activation="sigmoid", dtype="float32")(x)
+    outputs = Dense(len(classes), activation="softmax", dtype="float32")(x)
     model = Model(inputs=base_model.input, outputs=outputs)
 
     # Compile Model
