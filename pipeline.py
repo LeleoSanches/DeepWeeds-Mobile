@@ -211,7 +211,7 @@ def get_backbone(name: str, img_size):
     else:
         raise ValueError(
             "--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small, "
-            "efficientnetv2b0/b1/b2/b3"
+            "efficientnetv2b0/b1/b2/b3, resnet50, resnet101v2"
         )
 
     return preprocess_fn, base_model
@@ -302,10 +302,14 @@ def fit_model(
             "best_head.keras", monitor="val_accuracy", save_best_only=True, mode="max"
         ),
         callbacks.ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=16, min_lr=1e-6
+            monitor="val_loss", factor=0.5, patience=8, min_lr=1e-6, cooldown=2
         ),
         callbacks.EarlyStopping(
-            monitor="val_accuracy", patience=32, restore_best_weights=True, mode="max"
+            monitor="val_accuracy",
+            patience=16,
+            min_delta=0.002,
+            restore_best_weights=True,
+            mode="max",
         ),
         callbacks.CSVLogger(f"treino_log{name}.csv", append=False),
         callbacks.TensorBoard(log_dir="tb_logs", histogram_freq=1),
@@ -344,9 +348,7 @@ def fit_model(
 def set_finetunning(model):
     model.load_weights("best_head.keras")
 
-    unfreeze_from = int(
-        len(base_model.layers) * 0.6
-    )  # ajuste 0.6–0.75 conforme VRAM/estabilidade
+    unfreeze_from = int(len(base_model.layers) * 0.6)  # ajuste 0.6–0.75
     base_model.trainable = True
     for i, L in enumerate(base_model.layers):
         if i < unfreeze_from:
@@ -371,9 +373,15 @@ def fit_finetunning(model, train_generator, val_generator, epochs: int, name: st
             mode="max",
             save_best_only=True,
         ),
+        callbacks.CSVLogger(f"finetune_log{name}.csv", append=False),
         callbacks.EarlyStopping(
-            monitor="val_accuracy", mode="max", patience=20, restore_best_weights=True
+            monitor="val_accuracy",
+            mode="max",
+            patience=8,
+            min_delta=0.001,
+            restore_best_weights=True,
         ),
+        callbacks.TensorBoard(log_dir="tb_logs_finetune", update_freq="epoch"),
         callbacks.ReduceLROnPlateau(
             monitor="val_loss", factor=0.5, patience=4, min_lr=1e-6
         ),
