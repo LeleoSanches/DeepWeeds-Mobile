@@ -27,6 +27,8 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import mobilenet_v2
 from tensorflow.keras.applications import mobilenet_v3
 from tensorflow.keras.applications import resnet, resnet_v2
+from tensorflow.keras.applications import InceptionV3, NASNetMobile
+from tensorflow.keras.applications import inception_v3, nasnet
 from tensorflow.keras.applications import (
     MobileNetV3Large,
     MobileNetV3Small,
@@ -60,7 +62,7 @@ print("TF:", tf.__version__)
 print("GPUs visíveis:", tf.config.list_physical_devices("GPU"))
 
 
-# Global - Paths
+# Global - Path, cooldown=2s
 DIRS = get_project_dirs()
 IMG_DIR = str(DIRS["images"]) + "/"
 RESULTS_DIR = str(DIRS["results"]) + "/"
@@ -81,6 +83,8 @@ DEFAULT_IMG_SIZE = {
     "efficientnetv2b3": 300,
     "resnet50": 224,
     "resnet101v2": 224,
+    "nasnetmobile": 224,
+    "inceptionv3": 299,
 }
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
@@ -99,6 +103,8 @@ SUPPORTED_MODELS = [
     "efficientnetv2b3",
     "resnet50",
     "resnet101v2",
+    "nasnetmobile",
+    "inceptionv3",
 ]
 
 
@@ -208,10 +214,20 @@ def get_backbone(name: str, img_size):
         base_model = ResNet101V2(
             input_shape=input_shape, include_top=False, weights="imagenet"
         )
+    elif name == "nasnetmobile":
+        preprocess_fn = nasnet.preprocess_input
+        base_model = NASNetMobile(
+            input_shape=input_shape, include_top=False, weights="imagenet"
+        )
+    elif name == "inceptionv3":
+        preprocess_fn = inception_v3.preprocess_input
+        base_model = InceptionV3(
+            input_shape=input_shape, include_top=False, weights="imagenet"
+        )
     else:
         raise ValueError(
             "--model deve ser: mobilenetv2, mobilenetv3large, mobilenetv3small, "
-            "efficientnetv2b0/b1/b2/b3, resnet50, resnet101v2"
+            "efficientnetv2b0/b1/b2/b3, resnet50, resnet101v2, nasnetmobile, inceptionv3"
         )
 
     return preprocess_fn, base_model
