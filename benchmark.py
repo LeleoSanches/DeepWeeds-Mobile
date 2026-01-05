@@ -1,188 +1,358 @@
-import time
-import json
+#!/usr/bin/env python3
+# bench_inference.py
+from __future__ import annotations
+import os, time, argparse, json
+from pathlib import Path
+from typing import Optional, Tuple, List, Dict, Any
+
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import Rescaling, Normalization
 
-class benchmark(object):
-    @staticmethod
-    def _percentiles(a, ps=(50,90,95,99)):
-        return {f"p{p}": float(np.percentile(a, p)) for p in ps}
+AUTOTUNE = tf.data.AUTOTUNE
 
-    @staticmethod
-    def _one_sample_from_generator(gen):
-        # usa um batch do val_generator (já preprocessado) e recorta para BS=1
-        xb, _ = next(iter(gen))
-        x1 = xb[0:1]  # shape (1,H,W,3)
-        return x1
-    
 
-    @staticmethod
-    def benchmark_keras_inference(model, sample, runs=100, warmup=20, use_predict=False, jit_compile=True):
-        """
-        Mede latência do Keras (GPU/CPU conforme dispositivo atual).
-        - sample: tensor (1,H,W,3), já preprocessado como no treino
-        - use_predict=True usa model.predict (mais overhead); False usa chamada direta.
-        - jit_compile tenta XLA; se não rolar, cai para eager.
-        Retorna dict com média, std, p50/p90/p95/p99 (ms).
-        """
-        fn = lambda x: model(x, training=False)
-        if jit_compile:
-            try:
-                fn = tf.function(fn, jit_compile=True)
-                _ = fn(sample)  # compila
-            except Exception:
-                pass
+# ------------------------------------------------------------
+# Prepara GPU (opcional)
+# ------------------------------------------------------------
+def _enable_mem_growth():
+    try:
+        gpus = tf.config.list_physical_devices("GPU")
+        for g in gpus:
+            tf.config.experimental.set_memory_growth(g, True)
+    except Exception:
+        pass
 
-        # warmup
-        for _ in range(warmup):
-            y = fn(sample) if not use_predict else model.predict(sample, verbose=0)
-            if hasattr(y, "numpy"): y.numpy()  # força sync
 
-        # mede
-        times = []
-        for _ in range(runs):
-            t0 = time.perf_counter()
-            y = fn(sample) if not use_predict else model.predict(sample, verbose=0)
-            if hasattr(y, "numpy"): y.numpy()  # sincroniza GPU
-            dt = (time.perf_counter() - t0) * 1000.0
-            times.append(dt)
+# ------------------------------------------------------------
+# Registry de preprocess por backbone (lazy init)
+# ------------------------------------------------------------
+_REGISTRY: Dict[str, Any] = {}
 
-        times = np.asarray(times, dtype=np.float64)
-        out = {
-            "mean_ms": float(times.mean()),
-            "std_ms": float(times.std()),
-            **_percentiles(times),
-            "runs": int(runs), "warmup": int(warmup),
+
+def _init_registry():
+    from tensorflow.keras.applications import (
+        mobilenet_v2,
+        mobilenet_v3,
+        efficientnet_v2,
+        resnet,
+        resnet_v2,
+        inception_v3,
+        nasnet,
+    )
+
+    _REGISTRY.update(
+        {
+            "mobilenetv2": mobilenet_v2.preprocess_input,
+            "mobilenetv3small": mobilenet_v3.preprocess_input,
+            "mobilenetv3large": mobilenet_v3.preprocess_input,
+            "efficientnetv2b0": efficientnet_v2.preprocess_input,
+            "efficientnetv2b1": efficientnet_v2.preprocess_input,
+            "efficientnetv2b2": efficientnet_v2.preprocess_input,
+            "efficientnetv2b3": efficientnet_v2.preprocess_input,
+            "resnet50": resnet.preprocess_input,  # V1
+            "resnet101v2": resnet_v2.preprocess_input,  # V2
+            "inceptionv3": inception_v3.preprocess_input,
+            "nasnetmobile": nasnet.preprocess_input,
         }
-        return out
+    )
 
-    
-    @staticmethod
-    def save_latency_row(csv_path, row_dict):
-        import csv, os
-        header = list(row_dict.keys())
-        write_header = not os.path.exists(csv_path)
-        with open(csv_path, "a", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=header)
-            if write_header: w.writeheader()
-            w.writerow(row_dict)
-        print(f"[OK] Linha salva em: {csv_path}")
 
-    ### --- TFLite (float32 e INT8) ---
-    @staticmethod
-    def keras_to_tflite(model, tflite_path="model_fp32.tflite",
-                        optim=None, representative_gen=None,
-                        int8_io=False):
-        """
-        Converte Keras -> TFLite. 
-        - optim="DEFAULT" ativa PTQ.
-        - representative_gen: generator de dados representativos (necessário p/ INT8).
-        - int8_io=True força entrada/saída INT8 (para devices microcontrolados).
-        """
-        converter = tf.lite.TFLiteConverter.from_keras_model(model)
-        if optim == "DEFAULT":
-            converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        if representative_gen is not None:
-            converter.representative_dataset = representative_gen
-            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-            if int8_io:
-                converter.inference_input_type = tf.int8
-                converter.inference_output_type = tf.int8
-        tflite_model = converter.convert()
-        with open(tflite_path, "wb") as f:
-            f.write(tflite_model)
-        print(f"[OK] TFLite salvo em: {tflite_path}")
-        return tflite_path
+def _has_baked_preprocess(model: tf.keras.Model) -> bool:
+    for L in model.layers[:5]:
+        if (
+            isinstance(L, (Rescaling, Normalization))
+            or L.__class__.__name__ == "Lambda"
+        ):
+            return True
+    return False
 
-    @staticmethod
-    def _set_input(interpreter, arr):
-        idx = interpreter.get_input_details()[0]["index"]
-        # TFLite aceita float32 por padrão; se INT8, normalizamos para int8 simétrico.
-        dtype = interpreter.get_input_details()[0]["dtype"]
-        if dtype == np.float32:
-            interpreter.set_tensor(idx, arr.astype(np.float32))
-        elif dtype == np.int8:
-            scale, zero = interpreter.get_input_details()[0]["quantization"]
-            # arr aqui deve estar no mesmo espaço do treino (ex.: [-1,1] p/ MobileNetV2/V3).
-            # Convertemos para int8 da forma padrão: int8 = arr/scale + zero_point
-            # Se seu pipeline for diferente, ajuste esta linha.
-            q = np.clip(np.round(arr/scale + zero), -128, 127).astype(np.int8)
-            interpreter.set_tensor(idx, q)
-        else:
-            raise ValueError(f"Entrada dtype não suportado: {dtype}")
 
-    @staticmethod
-    def benchmark_tflite(tflite_path, sample, runs=200, warmup=50):
-        """
-        Mede latência do TFLite no host atual (CPU).
-        sample: numpy array (1,H,W,3) no espaço ORIGINAL do modelo Keras (ex.: [-1,1]).
-        """
-        interpreter = tf.lite.Interpreter(model_path=tflite_path, num_threads=os.cpu_count())
-        interpreter.allocate_tensors()
+def resolve_preprocess(
+    model: tf.keras.Model, model_key: Optional[str], model_path: str
+) -> Optional[Any]:
+    """
+    Retorna a função de preprocess adequada OU None se já estiver embutida no grafo.
+    Ordem:
+      1) Se o grafo tiver preprocess (Rescaling/Normalization/Lambda) -> None
+      2) Se model_key foi passado -> registry
+      3) Se existir <.keras>.meta.json com {"model_key": "..."} -> registry
+      4) Erro
+    """
+    if _has_baked_preprocess(model):
+        return None
 
-        # Warmup
-        for _ in range(warmup):
-            _set_input(interpreter, sample)
-            interpreter.invoke()
+    if model_key:
+        key = model_key.lower()
+        if not _REGISTRY:
+            _init_registry()
+        if key not in _REGISTRY:
+            raise ValueError(f"model_key não suportado: {model_key}")
+        return _REGISTRY[key]
 
-        # Bench
-        times = []
-        for _ in range(runs):
-            t0 = time.perf_counter()
-            _set_input(interpreter, sample)
-            interpreter.invoke()
-            dt = (time.perf_counter() - t0) * 1000.0
-            times.append(dt)
+    sidecar = Path(model_path).with_suffix(".keras.meta.json")
+    if sidecar.exists():
+        try:
+            meta = json.loads(sidecar.read_text(encoding="utf-8"))
+            key = str(meta.get("model_key", "")).lower()
+            if key:
+                if not _REGISTRY:
+                    _init_registry()
+                if key not in _REGISTRY:
+                    raise ValueError(f"model_key do sidecar não suportado: {key}")
+                return _REGISTRY[key]
+        except Exception:
+            pass
 
-        times = np.asarray(times, dtype=np.float64)
-        out = {
-            "mean_ms": float(times.mean()),
-            "std_ms": float(times.std()),
-            **_percentiles(times),
-            "runs": int(runs), "warmup": int(warmup),
-        }
-        return out
-    
+    raise ValueError(
+        "Não foi possível resolver o preprocess. "
+        "Passe --model-key (ex.: mobilenetv2, inceptionv3, efficientnetv2b0) "
+        "ou salve o modelo com o preprocess embutido (Rescaling/Normalization/Lambda) "
+        "ou crie um sidecar <modelo>.keras.meta.json com {'model_key': '...'}."
+    )
 
-# 1) pegue 1 amostra pronta do val_generator (já preprocessada)
-sample = _one_sample_from_generator(val_generator).numpy()
 
-# 2) benchmark KERAS na GPU (ou CPU, conforme onde o modelo está)
-lat_gpu = benchmark_keras_inference(model, sample, runs=200, warmup=30, jit_compile=True)
-row_gpu = {"model":"MobileNetV3Large", "mode":"keras_gpu", "bs":1, "img":f"{IMG_SIZE[0]}x{IMG_SIZE[1]}", **lat_gpu}
-save_latency_row("latency_results.csv", row_gpu)
-print("KERAS/GPU:", row_gpu)
+# ------------------------------------------------------------
+# I/O de dados
+# ------------------------------------------------------------
+def load_paths_and_labels(
+    labels_csv: Optional[str], filelist: Optional[str], images_root: Optional[str]
+) -> Tuple[List[str], Optional[List[int]]]:
+    """
+    Retorna (filepaths, labels_int_ou_None).
+    - Se labels_csv: espera colunas 'Filename' e 'Label'. Junta com images_root se fornecido.
+    - Se filelist: arquivo texto com um caminho por linha (labels = zeros).
+    """
+    if labels_csv:
+        df = pd.read_csv(labels_csv)
+        if "Filename" not in df.columns or "Label" not in df.columns:
+            raise ValueError("labels_csv deve ter colunas 'Filename' e 'Label'.")
+        fn = df["Filename"].astype(str).tolist()
+        if images_root:
+            fn = [os.path.join(images_root, x) for x in fn]
+        lbl = df["Label"].astype(int).tolist()
+        return fn, lbl
 
-# (Opcional) forçar CPU (copia pesos, pode demorar no warmup; útil só para comparação)
-with tf.device("/CPU:0"):
-    lat_cpu = benchmark_keras_inference(model, sample, runs=200, warmup=50, jit_compile=False)
-row_cpu = {"model":"MobileNetV3Large", "mode":"keras_cpu", "bs":1, "img":f"{IMG_SIZE[0]}x{IMG_SIZE[1]}", **lat_cpu}
-save_latency_row("latency_results.csv", row_cpu)
-print("KERAS/CPU:", row_cpu)
+    if filelist:
+        paths = [
+            ln.strip()
+            for ln in Path(filelist).read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ]
+        if images_root:
+            paths = [os.path.join(images_root, p) for p in paths]
+        return paths, None
 
-# 3) Converter para TFLite (FP32) e medir
-tflite_fp32 = keras_to_tflite(model, "model_fp32.tflite")
-lat_tflite_fp32 = benchmark_tflite(tflite_fp32, sample, runs=400, warmup=80)
-row_tflite_fp32 = {"model":"MobileNetV3Large", "mode":"tflite_fp32", "bs":1, "img":f"{IMG_SIZE[0]}x{IMG_SIZE[1]}", **lat_tflite_fp32}
-save_latency_row("latency_results.csv", row_tflite_fp32)
-print("TFLite FP32:", row_tflite_fp32)
+    raise ValueError("Informe --labels-csv ou --filelist.")
 
-# 4) Converter para TFLite INT8 (PTQ) e medir
-def representative_gen():
-    # amostras representativas para calibrar INT8
-    # use ~100-300 imagens; aqui só um exemplo curto
-    for fp in df_train["Filename"].sample(200, random_state=42):
-        img = tf.io.read_file(fp)
-        img = tf.image.decode_jpeg(img, channels=3)
-        img = tf.image.resize(img, IMG_SIZE)
-        img = preprocess_fn(img)              # MESMO preprocess do treino
-        yield [tf.expand_dims(img, 0)]
 
-tflite_int8 = keras_to_tflite(model, "model_int8.tflite",
-                              optim="DEFAULT",
-                              representative_gen=representative_gen,
-                              int8_io=False)  # mantenha FP32 I/O se preferir simplificar
-lat_tflite_int8 = benchmark_tflite(tflite_int8, sample, runs=400, warmup=80)
-row_tflite_int8 = {"model":"MobileNetV3Large", "mode":"tflite_int8", "bs":1, "img":f"{IMG_SIZE[0]}x{IMG_SIZE[1]}", **lat_tflite_int8}
-save_latency_row("latency_results.csv", row_tflite_int8)
-print("TFLite INT8:", row_tflite_int8)
+# ------------------------------------------------------------
+# Dataset de avaliação (sem augmentation)
+# ------------------------------------------------------------
+def _decode_resize_preprocess(path, label, img_size, preprocess_fn):
+    img = tf.io.decode_jpeg(tf.io.read_file(path), channels=3)
+    img = tf.image.resize(img, img_size, antialias=True)
+    img = tf.cast(img, tf.float32)
+    img = preprocess_fn(img) if preprocess_fn is not None else (img / 255.0)
+    return img, label
+
+
+def build_eval_dataset(
+    filepaths: List[str],
+    labels: Optional[List[int]],
+    img_size: Tuple[int, int],
+    preprocess_fn: Optional[Any],
+    batch_size: int = 1,
+    shuffle: bool = False,
+    cache: bool = True,
+    deterministic: bool = True,
+) -> tf.data.Dataset:
+    fp = tf.convert_to_tensor(filepaths, dtype=tf.string)
+    if labels is None:
+        labels = tf.zeros((tf.shape(fp)[0],), dtype=tf.int32)
+    else:
+        labels = tf.convert_to_tensor(labels, dtype=tf.int32)
+
+    ds = tf.data.Dataset.from_tensor_slices((fp, labels))
+    if shuffle:
+        ds = ds.shuffle(buffer_size=tf.shape(fp)[0], reshuffle_each_iteration=False)
+
+    map_fn = lambda p, y: _decode_resize_preprocess(p, y, img_size, preprocess_fn)
+    ds = ds.map(map_fn, num_parallel_calls=AUTOTUNE, deterministic=deterministic)
+
+    if cache:
+        ds = ds.cache()
+    ds = ds.batch(batch_size, drop_remainder=False).prefetch(AUTOTUNE)
+    return ds
+
+
+# ------------------------------------------------------------
+# Benchmarks de latência/FPS
+# ------------------------------------------------------------
+def benchmark_dataset(
+    model: tf.keras.Model, ds: tf.data.Dataset, steps: Optional[int]
+) -> Dict[str, Any]:
+    it = iter(ds)
+    times = []
+    n_steps = 0
+    last_batch = None
+
+    while True:
+        if steps is not None and n_steps >= steps:
+            break
+        try:
+            batch = next(it)
+        except StopIteration:
+            break
+
+        xb = batch[0] if isinstance(batch, (tuple, list)) else batch
+        last_batch = xb
+
+        t0 = time.perf_counter()
+        y = model(xb, training=False)
+        _ = (y.logits if hasattr(y, "logits") else y).numpy()  # sincroniza
+        times.append((time.perf_counter() - t0) * 1e3)
+        n_steps += 1
+
+    if not times:
+        raise RuntimeError("Dataset não produziu batches suficientes para benchmark.")
+
+    arr = np.asarray(times, dtype=np.float64)
+    p50, p95, mean = np.median(arr), np.percentile(arr, 95), arr.mean()
+
+    try:
+        bs = int(last_batch.shape[0])
+    except Exception:
+        bs = 1
+
+    return {
+        "steps": int(n_steps),
+        "batch": bs,
+        "lat_ms_p50": round(float(p50), 3),
+        "lat_ms_p95": round(float(p95), 3),
+        "lat_ms_mean": round(float(mean), 3),
+        "fps_p50": round(1000.0 / float(p50) * bs, 2),
+        "fps_p95": round(1000.0 / float(p95) * bs, 2),
+        "fps_mean": round(1000.0 / float(mean) * bs, 2),
+    }
+
+
+# ------------------------------------------------------------
+# Main
+# ------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser(
+        description="Benchmark de inferência no dataset real (sem augmentation)."
+    )
+    parser.add_argument(
+        "--model-path", required=True, help="Caminho do .keras (ou SavedModel)."
+    )
+    parser.add_argument(
+        "--model-key",
+        default=None,
+        help="Chave do backbone para resolver preprocess (ex.: mobilenetv2, efficientnetv2b0, inceptionv3). "
+        "Opcional se o modelo tiver preprocess embutido ou sidecar .meta.json.",
+    )
+    parser.add_argument(
+        "--labels-csv",
+        default=None,
+        help="CSV com colunas Filename e Label. Alternativa a --filelist.",
+    )
+    parser.add_argument(
+        "--filelist",
+        default=None,
+        help="Arquivo texto com um caminho por linha (labels assumidos = zeros). Alternativa a --labels-csv.",
+    )
+    parser.add_argument(
+        "--images-root",
+        default=None,
+        help="Prefixo para juntar com paths do CSV/filelist, se necessário.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch para o dataset (use 1 p/ latência).",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=200,
+        help="Número de lotes a medir (None = todo dataset).",
+    )
+    parser.add_argument(
+        "--out-csv", default="inference_bench.csv", help="Arquivo CSV de saída."
+    )
+    parser.add_argument(
+        "--shuffle", action="store_true", help="Embaralhar ordem antes de medir."
+    )
+    args = parser.parse_args()
+
+    _enable_mem_growth()
+
+    # Carrega modelo
+    if not Path(args.model_path).exists():
+        raise FileNotFoundError(f"Caminho não encontrado: {args.model_path}")
+    model = load_model(args.model_path, compile=False)
+
+    # Resolve input size do modelo
+    ish = model.input_shape
+    if isinstance(ish, (list, tuple)) and isinstance(ish[0], (list, tuple)):
+        ish = ish[0]
+    H, W = int(ish[1]), int(ish[2])
+
+    # Resolve preprocess
+    preprocess_fn = resolve_preprocess(model, args.model_key, args.model_path)
+
+    # Carrega caminhos e rótulos
+    filepaths, labels = load_paths_and_labels(
+        args.labels_csv, args.filelist, args.images_root
+    )
+    if len(filepaths) == 0:
+        raise ValueError("Nenhum caminho de imagem encontrado.")
+
+    # Monta dataset real (sem augmentation)
+    ds = build_eval_dataset(
+        filepaths=filepaths,
+        labels=labels,
+        img_size=(H, W),
+        preprocess_fn=preprocess_fn,
+        batch_size=args.batch_size,
+        shuffle=bool(args.shuffle),
+        cache=True,
+        deterministic=True,
+    )
+
+    # Benchmark
+    metrics = benchmark_dataset(model, ds, steps=None if args.steps < 0 else args.steps)
+
+    # Resumo + CSV
+    row = {
+        "file": Path(args.model_path).name,
+        "path": str(Path(args.model_path).resolve()),
+        "input_h": H,
+        "input_w": W,
+        "batch": metrics["batch"],
+        "steps": metrics["steps"],
+        "lat_ms_p50": metrics["lat_ms_p50"],
+        "lat_ms_p95": metrics["lat_ms_p95"],
+        "lat_ms_mean": metrics["lat_ms_mean"],
+        "fps_p50": metrics["fps_p50"],
+        "fps_p95": metrics["fps_p95"],
+        "fps_mean": metrics["fps_mean"],
+        "model_key": (args.model_key or ""),
+        "preprocess_embutido": int(preprocess_fn is None),
+    }
+
+    print("[RESULT]")
+    for k, v in row.items():
+        print(f"{k}: {v}")
+
+    pd.DataFrame([row]).to_csv(args.out_csv, index=False)
+    print(f"[OK] CSV salvo em: {args.out_csv}")
+
+
+if __name__ == "__main__":
+    main()

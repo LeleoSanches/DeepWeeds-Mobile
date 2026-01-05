@@ -1,0 +1,475 @@
+{
+  "best_efficientnetv2b0_finetune.keras": {
+    "file": "best_efficientnetv2b0_finetune.keras",
+    "path": "models/best_efficientnetv2b0_finetune.keras",
+    "trainable": 4527705,
+    "non_trainable": 1721888,
+    "total": 6249593,
+    "memory_MB": 23.84,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 6249561,
+        "MB": 23.84
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 1455975785,
+    "GFLOPs": 1.455976,
+    "GMAC": 0.727988,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 3.413,
+    "lat_ms_p95": 4.001,
+    "lat_ms_mean": 3.487,
+    "fps_p50": 292.95,
+    "fps_p95": 249.94,
+    "fps_mean": 286.75,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "efficientnetv2b0"
+  },
+  "best_efficientnetv2b1_finetune.keras": {
+    "file": "best_efficientnetv2b1_finetune.keras",
+    "path": "models/best_efficientnetv2b1_finetune.keras",
+    "trainable": 5265637,
+    "non_trainable": 1995780,
+    "total": 7261417,
+    "memory_MB": 27.7,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 7261373,
+        "MB": 27.7
+      }
+    },
+    "input_h": 240,
+    "input_w": 240,
+    "FLOPs": 2424850341,
+    "GFLOPs": 2.42485,
+    "GMAC": 1.212425,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 4.084,
+    "lat_ms_p95": 4.396,
+    "lat_ms_mean": 4.144,
+    "fps_p50": 244.86,
+    "fps_p95": 227.46,
+    "fps_mean": 241.3,
+    "inputs": [
+      [
+        null,
+        240,
+        240,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "efficientnetv2b1"
+  },
+  "best_efficientnetv2b2_finetune.keras": {
+    "file": "best_efficientnetv2b2_finetune.keras",
+    "path": "models/best_efficientnetv2b2_finetune.keras",
+    "trainable": 6759069,
+    "non_trainable": 2373368,
+    "total": 9132437,
+    "memory_MB": 34.84,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 9132391,
+        "MB": 34.84
+      }
+    },
+    "input_h": 260,
+    "input_w": 260,
+    "FLOPs": 3437594227,
+    "GFLOPs": 3.437594,
+    "GMAC": 1.718797,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 4.709,
+    "lat_ms_p95": 4.882,
+    "lat_ms_mean": 4.73,
+    "fps_p50": 212.34,
+    "fps_p95": 204.84,
+    "fps_mean": 211.43,
+    "inputs": [
+      [
+        null,
+        260,
+        260,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "efficientnetv2b2"
+  },
+  "best_efficientnetv2b3_finetune.keras": {
+    "file": "best_efficientnetv2b3_finetune.keras",
+    "path": "models/best_efficientnetv2b3_finetune.keras",
+    "trainable": 9451383,
+    "non_trainable": 3875078,
+    "total": 13326461,
+    "memory_MB": 50.84,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 13326407,
+        "MB": 50.84
+      }
+    },
+    "input_h": 300,
+    "input_w": 300,
+    "FLOPs": 6091966635,
+    "GFLOPs": 6.091967,
+    "GMAC": 3.045983,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 6.261,
+    "lat_ms_p95": 6.557,
+    "lat_ms_mean": 6.29,
+    "fps_p50": 159.71,
+    "fps_p95": 152.51,
+    "fps_mean": 158.98,
+    "inputs": [
+      [
+        null,
+        300,
+        300,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "efficientnetv2b3"
+  },
+  "best_inceptionv3_finetune.keras": {
+    "file": "best_inceptionv3_finetune.keras",
+    "path": "models/best_inceptionv3_finetune.keras",
+    "trainable": 15831561,
+    "non_trainable": 6498082,
+    "total": 22329643,
+    "memory_MB": 85.18,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 22329641,
+        "MB": 85.18
+      }
+    },
+    "input_h": 299,
+    "input_w": 299,
+    "FLOPs": 11465941174,
+    "GFLOPs": 11.465941,
+    "GMAC": 5.732971,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 7.199,
+    "lat_ms_p95": 7.631,
+    "lat_ms_mean": 7.286,
+    "fps_p50": 138.91,
+    "fps_p95": 131.05,
+    "fps_mean": 137.26,
+    "inputs": [
+      [
+        null,
+        299,
+        299,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "inceptionv3"
+  },
+  "best_mobilenetv2_finetune.keras": {
+    "file": "best_mobilenetv2_finetune.keras",
+    "path": "models/best_mobilenetv2_finetune.keras",
+    "trainable": 2265481,
+    "non_trainable": 322754,
+    "total": 2588235,
+    "memory_MB": 9.87,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 2588233,
+        "MB": 9.87
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 613386486,
+    "GFLOPs": 0.613386,
+    "GMAC": 0.306693,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 2.568,
+    "lat_ms_p95": 2.655,
+    "lat_ms_mean": 2.467,
+    "fps_p50": 389.45,
+    "fps_p95": 376.61,
+    "fps_mean": 405.35,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "mobilenetv2"
+  },
+  "best_mobilenetv3large_finetune.keras": {
+    "file": "best_mobilenetv3large_finetune.keras",
+    "path": "models/best_mobilenetv3large_finetune.keras",
+    "trainable": 2971633,
+    "non_trainable": 273050,
+    "total": 3244683,
+    "memory_MB": 12.38,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 3244681,
+        "MB": 12.38
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 444040590,
+    "GFLOPs": 0.444041,
+    "GMAC": 0.22202,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 2.589,
+    "lat_ms_p95": 2.923,
+    "lat_ms_mean": 2.562,
+    "fps_p50": 386.2,
+    "fps_p95": 342.1,
+    "fps_mean": 390.31,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "mobilenetv3large"
+  },
+  "best_mobilenetv3small_finetune.keras": {
+    "file": "best_mobilenetv3small_finetune.keras",
+    "path": "models/best_mobilenetv3small_finetune.keras",
+    "trainable": 908153,
+    "non_trainable": 180994,
+    "total": 1089147,
+    "memory_MB": 4.15,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 1089145,
+        "MB": 4.15
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 116310014,
+    "GFLOPs": 0.11631,
+    "GMAC": 0.058155,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 2.007,
+    "lat_ms_p95": 2.429,
+    "lat_ms_mean": 2.058,
+    "fps_p50": 498.15,
+    "fps_p95": 411.65,
+    "fps_mean": 485.96,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "mobilenetv3small"
+  },
+  "best_nasnetmobile_finetune.keras": {
+    "file": "best_nasnetmobile_finetune.keras",
+    "path": "models/best_nasnetmobile_finetune.keras",
+    "trainable": 3670673,
+    "non_trainable": 871950,
+    "total": 4542623,
+    "memory_MB": 17.33,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 4542621,
+        "MB": 17.33
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 1146304642,
+    "GFLOPs": 1.146305,
+    "GMAC": 0.573152,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 9.077,
+    "lat_ms_p95": 9.631,
+    "lat_ms_mean": 9.127,
+    "fps_p50": 110.17,
+    "fps_p95": 103.83,
+    "fps_mean": 109.56,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "nasnetmobile"
+  },
+  "best_resnet101v2_finetune.keras": {
+    "file": "best_resnet101v2_finetune.keras",
+    "path": "models/best_resnet101v2_finetune.keras",
+    "trainable": 26891785,
+    "non_trainable": 16261634,
+    "total": 43153419,
+    "memory_MB": 164.62,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 43153417,
+        "MB": 164.62
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 14431086006,
+    "GFLOPs": 14.431086,
+    "GMAC": 7.215543,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 9.303,
+    "lat_ms_p95": 9.909,
+    "lat_ms_mean": 9.412,
+    "fps_p50": 107.5,
+    "fps_p95": 100.92,
+    "fps_mean": 106.25,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "resnet101v2"
+  },
+  "best_resnet50_finetune.keras": {
+    "file": "best_resnet50_finetune.keras",
+    "path": "models/best_resnet50_finetune.keras",
+    "trainable": 19680521,
+    "non_trainable": 4434050,
+    "total": 24114571,
+    "memory_MB": 91.99,
+    "dtype_breakdown": {
+      "float32": {
+        "params": 24114569,
+        "MB": 91.99
+      }
+    },
+    "input_h": 224,
+    "input_w": 224,
+    "FLOPs": 7752250806,
+    "GFLOPs": 7.752251,
+    "GMAC": 3.876125,
+    "bench_batch": 1,
+    "bench_runs": 100,
+    "bench_warmup": 20,
+    "lat_ms_p50": 6.088,
+    "lat_ms_p95": 6.39,
+    "lat_ms_mean": 6.097,
+    "fps_p50": 164.26,
+    "fps_p95": 156.5,
+    "fps_mean": 164.02,
+    "inputs": [
+      [
+        null,
+        224,
+        224,
+        3
+      ]
+    ],
+    "outputs": [
+      [
+        null,
+        9
+      ]
+    ],
+    "model_name": "resnet50"
+  }
+}
