@@ -105,7 +105,7 @@ run_benchmark.sh          # Script Bash para execução automatizada do benchmar
 
 ## 📊 Resultados e Análise Comparativa
 
-Os modelos treinados encontram-se disponíveis em: [Drive](https://drive.google.com/drive/folders/11uHxJA8CDuSAT4BEAGDB7QMbUFpfMilt)
+### Os modelos treinados encontram-se disponíveis em: [Repositorio de Modelos DeepWeeds-Mobile](https://drive.google.com/drive/folders/11uHxJA8CDuSAT4BEAGDB7QMbUFpfMilt)
 
 ---
 
@@ -114,7 +114,7 @@ Os modelos treinados encontram-se disponíveis em: [Drive](https://drive.google.
 A Tabela a seguir consolida os principais indicadores de cada arquitetura avaliada após *fine-tuning*, considerando:
 - **Parâmetros totais** (milhões)
 - **Custo computacional** (GMAC)
-- **Latência de inferência** (ms, p50, batch = 1)
+- **Latência de inferência** (ms, p50, batch = 1, imagens dummy)
 - **Desempenho global** (F1-score ponderado)
 
 | Modelo | Parâmetros (M) | GMAC | Latência p50 (ms) | F1-weighted |
