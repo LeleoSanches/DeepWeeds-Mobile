@@ -8,6 +8,9 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from pathlib import Path
 import json
+from tensorflow.python.framework.convert_to_constants import (
+    convert_variables_to_constants_v2,
+)
 
 # Global Paths
 MODELS_PATH = "models/"
@@ -125,16 +128,6 @@ class process_results:
             )
 
         return globais
-
-
-import os
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.python.framework.convert_to_constants import (
-    convert_variables_to_constants_v2,
-)
 
 
 class KerasModelInspector:
@@ -432,7 +425,13 @@ print(f"Result files: {result_file_names}")
 results_byclass = process_results.process_txt(result_file_names)
 results_macro = process_results.process_global_metrics(result_file_names)
 print(results_byclass)
+df = pd.DataFrame(data=results_byclass)
+df = df.round(4)
+df.to_csv("results.csv", index=False)
 print(results_macro)
+df = pd.DataFrame(data=results_macro)
+df = df.round(4)
+df.to_csv("results_macro.csv", index=False)
 #
 
 results = {}

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# bench_inference.py
 from __future__ import annotations
 import os, time, argparse, json
 from pathlib import Path
@@ -14,9 +12,7 @@ from tensorflow.keras.layers import Rescaling, Normalization
 AUTOTUNE = tf.data.AUTOTUNE
 
 
-# ------------------------------------------------------------
 # Prepara GPU (opcional)
-# ------------------------------------------------------------
 def _enable_mem_growth():
     try:
         gpus = tf.config.list_physical_devices("GPU")
@@ -26,9 +22,7 @@ def _enable_mem_growth():
         pass
 
 
-# ------------------------------------------------------------
 # Registry de preprocess por backbone (lazy init)
-# ------------------------------------------------------------
 _REGISTRY: Dict[str, Any] = {}
 
 
@@ -114,9 +108,6 @@ def resolve_preprocess(
     )
 
 
-# ------------------------------------------------------------
-# I/O de dados
-# ------------------------------------------------------------
 def load_paths_and_labels(
     labels_csv: Optional[str], filelist: Optional[str], images_root: Optional[str]
 ) -> Tuple[List[str], Optional[List[int]]]:
@@ -148,9 +139,7 @@ def load_paths_and_labels(
     raise ValueError("Informe --labels-csv ou --filelist.")
 
 
-# ------------------------------------------------------------
 # Dataset de avaliação (sem augmentation)
-# ------------------------------------------------------------
 def _decode_resize_preprocess(path, label, img_size, preprocess_fn):
     img = tf.io.decode_jpeg(tf.io.read_file(path), channels=3)
     img = tf.image.resize(img, img_size, antialias=True)
@@ -188,9 +177,7 @@ def build_eval_dataset(
     return ds
 
 
-# ------------------------------------------------------------
 # Benchmarks de latência/FPS
-# ------------------------------------------------------------
 def benchmark_dataset(
     model: tf.keras.Model, ds: tf.data.Dataset, steps: Optional[int]
 ) -> Dict[str, Any]:

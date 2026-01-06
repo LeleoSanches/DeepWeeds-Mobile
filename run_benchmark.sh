@@ -25,10 +25,7 @@ MODELS=(
   "efficientnetv2b3"
 )
 
-# Se algum modelo foi salvo com preprocess ASSADO no grafo,
-# coloque o nome aqui para rodar sem --model-key.
 BAKED_PREPROCESS_MODELS=(
-  # exemplo: "mobilenetv2"
 )
 
 # ========= FUNÇÕES AUX =========
@@ -67,13 +64,10 @@ for m in "${MODELS[@]}"; do
 done
 
 # ========= CONSOLIDAÇÃO =========
-# Junta todos os CSVs em um só, mantendo apenas um cabeçalho
 COMBINED="${OUTDIR}/bench_all.csv"
 if [[ ${#ALL_CSVS[@]} -gt 0 ]]; then
   echo "[INFO $(timestamp)] Consolidando CSVs em: $COMBINED"
-  # copia o primeiro com cabeçalho
   cp "${ALL_CSVS[0]}" "$COMBINED"
-  # acrescenta os demais sem o cabeçalho
   for ((i=1; i<${#ALL_CSVS[@]}; i++)); do
     tail -n +2 "${ALL_CSVS[$i]}" >> "$COMBINED"
   done
