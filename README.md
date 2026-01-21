@@ -134,7 +134,7 @@ A Tabela a seguir consolida os principais indicadores de cada arquitetura avalia
 > **Observação**: Os valores completos e reprodutíveis (incluindo precisão, recall e métricas por classe) encontram-se em `results/`, `results_macro.csv` e `models_summary.json`.
 
 ---
-## Resultado
+## Resultado de Acurácia por Latência de inferência
 
 ![Resultados](analysis/accuracy_vs_latency.png)
 
