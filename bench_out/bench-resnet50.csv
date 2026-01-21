@@ -1,0 +1,2 @@
+file,path,input_h,input_w,batch,steps,lat_ms_p50,lat_ms_p95,lat_ms_mean,fps_p50,fps_p95,fps_mean,model_key,preprocess_embutido
+best_resnet50_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_resnet50_finetune.keras,224,224,1,200,91.102,94.718,93.909,10.98,10.56,10.65,resnet50,0

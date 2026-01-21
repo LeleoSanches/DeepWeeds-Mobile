@@ -1,0 +1,2 @@
+file,path,input_h,input_w,batch,steps,lat_ms_p50,lat_ms_p95,lat_ms_mean,fps_p50,fps_p95,fps_mean,model_key,preprocess_embutido
+best_inceptionv3_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_inceptionv3_finetune.keras,299,299,1,200,126.67,130.761,131.961,7.89,7.65,7.58,inceptionv3,0

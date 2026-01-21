@@ -1,0 +1,12 @@
+file,path,input_h,input_w,batch,steps,lat_ms_p50,lat_ms_p95,lat_ms_mean,fps_p50,fps_p95,fps_mean,model_key,preprocess_embutido
+best_mobilenetv2_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_mobilenetv2_finetune.keras,224,224,1,200,58.021,60.039,59.447,17.24,16.66,16.82,mobilenetv2,0
+best_mobilenetv3large_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_mobilenetv3large_finetune.keras,224,224,1,200,71.014,73.148,72.185,14.08,13.67,13.85,mobilenetv3large,1
+best_mobilenetv3small_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_mobilenetv3small_finetune.keras,224,224,1,200,61.045,63.081,62.262,16.38,15.85,16.06,mobilenetv3small,1
+best_resnet50_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_resnet50_finetune.keras,224,224,1,200,91.102,94.718,93.909,10.98,10.56,10.65,resnet50,0
+best_resnet101v2_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_resnet101v2_finetune.keras,224,224,1,200,171.877,176.338,173.122,5.82,5.67,5.78,resnet101v2,0
+best_inceptionv3_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_inceptionv3_finetune.keras,299,299,1,200,126.67,130.761,131.961,7.89,7.65,7.58,inceptionv3,0
+best_nasnetmobile_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_nasnetmobile_finetune.keras,224,224,1,200,269.116,273.153,267.946,3.72,3.66,3.73,nasnetmobile,0
+best_efficientnetv2b0_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b0_finetune.keras,224,224,1,200,132.185,134.501,134.694,7.57,7.43,7.42,efficientnetv2b0,1
+best_efficientnetv2b1_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b1_finetune.keras,240,240,1,200,163.423,166.958,165.853,6.12,5.99,6.03,efficientnetv2b1,1
+best_efficientnetv2b2_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b2_finetune.keras,260,260,1,200,166.871,172.168,171.034,5.99,5.81,5.85,efficientnetv2b2,1
+best_efficientnetv2b3_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b3_finetune.keras,300,300,1,200,198.005,204.226,202.375,5.05,4.9,4.94,efficientnetv2b3,1
