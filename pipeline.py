@@ -19,8 +19,6 @@ from tensorflow.keras import layers, Model, callbacks, optimizers
 from tensorflow.keras import mixed_precision
 from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.preprocessing import image_dataset_from_directory
-from tensorflow.keras.utils import image_dataset_from_directory
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Models and Backbone's
@@ -47,7 +45,7 @@ from tensorflow.keras.applications import (
 from tensorflow.keras.applications import efficientnet_v2
 
 # Utils
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
@@ -68,10 +66,11 @@ IMG_DIR = str(DIRS["images"]) + "/"
 RESULTS_DIR = str(DIRS["results"]) + "/"
 MODELS_DIR = str(DIRS["models"]) + "/"
 LABEL_DIR = str(DIRS["labels"]) + "/"
+OUTPUT_DIR = RESULTS_DIR
 
 # Global - Parâmetros
 MODEL_NAME = "mobilenetv2"
-BATCH_SIZE = 32
+
 IMG_SIZE = (224, 224)
 DEFAULT_IMG_SIZE = {
     "mobilenetv2": 224,
@@ -88,9 +87,7 @@ DEFAULT_IMG_SIZE = {
 }
 AUTOTUNE = tf.data.AUTOTUNE
 classes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-TRAINING_EPOCHS = 200
-FINETUNNING_EPOCHS = 100
-TEST_SIZE = 0.3
+
 
 # Global
 SUPPORTED_MODELS = [
@@ -120,41 +117,75 @@ def build_argparser():
         choices=SUPPORTED_MODELS,
         help="Backbone a utilizar. Opções: %(choices)s (padrão: %(default)s)",
     )
+    parser.add_argument(
+        "--fold",
+        "-f",
+        default="fold_1",
+        help="Fold a utilizar. Opções: fold_1, fold_2, fold_3 (padrão: %(default)s)",
+    )
+    parser.add_argument(
+        "--batch_size",
+        "-b",
+        default=32,
+        type=int,
+        help="Tamanho do batch. (padrão: %(default)s)",
+    )
+    parser.add_argument(
+        "--training_epochs",
+        "-te",
+        default=200,
+        type=int,
+        help="Número de épocas para treinamento. (padrão: %(default)s)",
+    )
+    parser.add_argument(
+        "--finetunning_epochs",
+        "-fe",
+        default=100,
+        type=int,
+        help="Número de épocas para fine-tuning. (padrão: %(default)s)",
+    )
     return parser
 
 
-def load_split_data(label_dir: str, test_size: float):
-    # Load Labels df
-    try:
-        data = pd.read_csv(LABEL_DIR + "labels.csv")
-        data["Label"] = data["Label"].astype(str)
-        data["Filename"] = data["Filename"].apply(lambda x: os.path.join(IMG_DIR, x))
+def load_split_data(label_dir: str, fold: str = "fold_1"):
+    fold_path = Path(label_dir) / fold
 
-    except FileNotFoundError as e:
-        print(
-            f"[ERRO] labels.csv não encontrado: {LABEL_DIR} "
-            f"(verifique se 'label_dir' está correto)."
+    if not fold_path.exists():
+        raise FileNotFoundError(
+            f"Fold '{fold}' não encontrado em {label_dir}. "
+            f"Verifique se os folds foram gerados corretamente."
         )
-        raise
+    for split in ["train.csv", "val.csv", "test.csv"]:
+        if not (fold_path / split).exists():
+            raise FileNotFoundError(
+                f"Arquivo '{split}' não encontrado em {fold_path}. "
+                f"Verifique se os arquivos de split foram gerados corretamente."
+            )
+    df_train = pd.read_csv(fold_path / "train.csv")
+    df_train["Label"] = df_train["Label"].astype(str)
+    df_train["Filename"] = df_train["Filename"].apply(
+        lambda x: os.path.join(IMG_DIR, x)
+    )
 
-    # Train test split
-    df_train, df_temp = train_test_split(
-        data, test_size=test_size, stratify=data["Label"], random_state=75
-    )
-    df_val, df_test = train_test_split(
-        df_temp, test_size=0.5, stratify=df_temp["Label"], random_state=75
-    )
+    df_val = pd.read_csv(fold_path / "val.csv")
+    df_val["Label"] = df_val["Label"].astype(str)
+    df_val["Filename"] = df_val["Filename"].apply(lambda x: os.path.join(IMG_DIR, x))
+
+    df_test = pd.read_csv(fold_path / "test.csv")
+    df_test["Label"] = df_test["Label"].astype(str)
+    df_test["Filename"] = df_test["Filename"].apply(lambda x: os.path.join(IMG_DIR, x))
+
     df_train = df_train.reset_index(drop=True)
     df_val = df_val.reset_index(drop=True)
     df_test = df_test.reset_index(drop=True)
-    # 2) Classes consistentes (ordenadas)
-    classes = sorted(data["Label"].unique().tolist())
 
-    # Debbug
-    print("[DEBUG] Filename resolvido:", data["Filename"].iloc[0])
+    classes = sorted(df_train["Label"].unique())
+
+    print(f"[INFO] Fold '{fold}' carregado com sucesso:")
     print(
-        f"[DEBUG] Tamanho total: {len(data)} | Treino: {len(df_train)} | Validação: {len(df_val)} "
-        f"({len(df_val)/len(data)*100:.1f}% val)"
+        f"[DEBUG] Tamanho total: {len(df_train) + len(df_val) + len(df_test)} | "
+        f"Treino: {len(df_train)} | Validação: {len(df_val)} | Teste: {len(df_test)} "
+        f"({len(df_val)/(len(df_train) + len(df_val) + len(df_test))*100:.1f}% val)"
     )
 
     return df_train, df_val, df_test, classes
@@ -236,7 +267,9 @@ def get_backbone(name: str, img_size):
 
 
 # 4) Dois datagens - augment só no treino
-def set_generators(preprocess_fn, df_train, df_val, df_test, img_size, debbug: bool):
+def set_generators(
+    preprocess_fn, df_train, df_val, df_test, img_size, BATCH_SIZE, debbug: bool
+):
 
     # Augmentation
     train_datagen = ImageDataGenerator(
@@ -326,7 +359,13 @@ def set_transferlearning(base_model):
 
 
 def fit_model(
-    model, train_generator, test_generator, name: str, class_weight: bool, epochs: int
+    model,
+    train_generator,
+    val_generator,
+    name: str,
+    class_weight: bool,
+    epochs: int,
+    fold: str,
 ):
 
     cbs = [
@@ -338,12 +377,12 @@ def fit_model(
         ),
         callbacks.EarlyStopping(
             monitor="val_accuracy",
-            patience=32,
+            patience=16,
             # min_delta=0.002,
             restore_best_weights=True,
             mode="max",
         ),
-        callbacks.CSVLogger(f"treino_log{name}.csv", append=False),
+        callbacks.CSVLogger(f"treino_log{name}_{fold}.csv", append=False),
         callbacks.TensorBoard(log_dir="tb_logs", histogram_freq=1),
     ]
 
@@ -357,7 +396,7 @@ def fit_model(
 
         history = model.fit(
             train_generator,
-            validation_data=test_generator,
+            validation_data=val_generator,
             epochs=epochs,
             callbacks=cbs,
             class_weight=class_weight,
@@ -367,7 +406,7 @@ def fit_model(
     else:
         history = model.fit(
             train_generator,
-            validation_data=test_generator,
+            validation_data=val_generator,
             epochs=epochs,
             callbacks=cbs,
             verbose=1,
@@ -397,19 +436,21 @@ def set_finetunning(model):
     return model
 
 
-def fit_finetunning(model, train_generator, test_generator, epochs: int, name: str):
+def fit_finetunning(
+    model, train_generator, val_generator, epochs: int, name: str, fold: str
+):
     cbs_ft = [
         callbacks.ModelCheckpoint(
-            f"best_{name}_finetune.keras",
+            f"best_{name}_{fold}_finetune.keras",
             monitor="val_accuracy",
             mode="max",
             save_best_only=True,
         ),
-        callbacks.CSVLogger(f"finetune_log{name}.csv", append=False),
+        callbacks.CSVLogger(f"finetune_log{name}_{fold}.csv", append=False),
         callbacks.EarlyStopping(
             monitor="val_accuracy",
             mode="max",
-            patience=16,
+            patience=8,
             # min_delta=0.001,
             restore_best_weights=True,
         ),
@@ -421,7 +462,7 @@ def fit_finetunning(model, train_generator, test_generator, epochs: int, name: s
 
     history_ft = model.fit(
         train_generator,
-        validation_data=test_generator,
+        validation_data=val_generator,
         epochs=epochs,
         callbacks=cbs_ft,
         verbose=1,
@@ -429,13 +470,14 @@ def fit_finetunning(model, train_generator, test_generator, epochs: int, name: s
     return history_ft
 
 
-def set_predict(model_name):
-    model_path = f"best_{model_name}_finetune.keras"
+def set_predict(model_name, fold: str):
+    model_path = f"best_{model_name}_{fold}_finetune.keras"
     print(f"[INFO] Carregando modelo para predição: {model_path}")
     model = tf.keras.models.load_model(model_path, compile=False)
     return model
 
 
+"""
 def fit_predict(model, val_generator, model_name):
     print(f"[INFO] Avaliando modelo {model_name} na validação...")
     y_true = val_generator.classes
@@ -460,6 +502,74 @@ def fit_predict(model, val_generator, model_name):
                 for metric_name, metric_value in metrics.items():
                     f.write(f"  {metric_name}: {metric_value:.4f}\n")
     return acc, report_dict
+"""
+
+
+def fit_predict(model, val_generator, model_name, output_dir=".", fold_name=None):
+    print(f"[INFO] Avaliando modelo {model_name} na validação...")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    y_true = val_generator.classes
+    y_prob = model.predict(val_generator, verbose=0)
+    y_pred = np.argmax(y_prob, axis=1)
+
+    acc = accuracy_score(y_true, y_pred)
+
+    idx_to_class = {v: k for k, v in val_generator.class_indices.items()}
+    class_names = [idx_to_class[i] for i in range(len(idx_to_class))]
+
+    report_dict = classification_report(
+        y_true,
+        y_pred,
+        target_names=class_names,
+        output_dict=True,
+    )
+
+    print(f"Val Accuracy: {acc:.4f}")
+    print("Classification Report:", report_dict)
+
+    # ===== relatório agregado =====
+    report_suffix = f"_{fold_name}" if fold_name else ""
+    report_path = os.path.join(
+        output_dir, f"report_{model_name}{report_suffix}_finetune.txt"
+    )
+
+    with open(report_path, "w") as f:
+        f.write(f"Val Accuracy: {acc:.4f}\n")
+        f.write("Classification Report:\n")
+        for label, metrics in report_dict.items():
+            if label in class_names:
+                f.write(f"{label}:\n")
+                for metric_name, metric_value in metrics.items():
+                    f.write(f"  {metric_name}: {metric_value:.4f}\n")
+
+    # ===== saída por instância =====
+    df_pred = pd.DataFrame(
+        {
+            "filename": val_generator.filenames,
+            "y_true_idx": y_true,
+            "y_pred_idx": y_pred,
+            "y_true": [idx_to_class[i] for i in y_true],
+            "y_pred": [idx_to_class[i] for i in y_pred],
+            "correct": (y_true == y_pred).astype(int),
+            "pred_confidence": np.max(y_prob, axis=1),
+        }
+    )
+
+    # adiciona probabilidade de cada classe
+    for i, class_name in enumerate(class_names):
+        df_pred[f"prob_{class_name}"] = y_prob[:, i]
+
+    pred_suffix = f"_{fold_name}" if fold_name else ""
+    pred_path = os.path.join(
+        output_dir, f"predictions_{model_name}{pred_suffix}_finetune.csv"
+    )
+    df_pred.to_csv(pred_path, index=False)
+
+    print(f"[INFO] Predições por instância salvas em: {pred_path}")
+
+    return acc, report_dict, df_pred
 
 
 # Ajusta img_size pelo modelo
@@ -474,6 +584,10 @@ if __name__ == "__main__":
     parser = build_argparser()
     args = parser.parse_args()
     MODEL_NAME = str(args.model)
+    FOLD_NAME = str(args.fold)
+    BATCH_SIZE = int(args.batch_size)
+    TRAINING_EPOCHS = int(args.training_epochs)
+    FINETUNNING_EPOCHS = int(args.finetunning_epochs)
 
     print(f"[INFO] Modelo selecionado: {MODEL_NAME}")
     IMG_SIZE = auto_img_size(MODEL_NAME)
@@ -481,63 +595,80 @@ if __name__ == "__main__":
 
     # Training
     df_train, df_val, df_test, classes = load_split_data(
-        label_dir=LABEL_DIR, test_size=TEST_SIZE
+        label_dir=LABEL_DIR, fold=FOLD_NAME
     )
     preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
     train_generator, val_generator, test_generator = set_generators(
-        preprocess_fn, df_train, df_val, df_test, IMG_SIZE, debbug=True
+        preprocess_fn,
+        df_train,
+        df_val,
+        df_test,
+        IMG_SIZE,
+        BATCH_SIZE=BATCH_SIZE,
+        debbug=True,
     )
     model = set_transferlearning(base_model)
     history = fit_model(
         model,
         train_generator,
-        test_generator,
+        val_generator,
         name=MODEL_NAME,
         class_weight=False,
         epochs=TRAINING_EPOCHS,
+        fold=FOLD_NAME,
     )
     model = set_finetunning(model)
     history_ft = fit_finetunning(
         model,
         train_generator,
-        test_generator,
+        val_generator,
         epochs=FINETUNNING_EPOCHS,
         name=MODEL_NAME,
+        fold=FOLD_NAME,
     )
 
-    model = set_predict(MODEL_NAME)
-    acc, report_dict = fit_predict(model, val_generator, MODEL_NAME)
+    model = set_predict(MODEL_NAME, FOLD_NAME)
+    # acc, report_dict = fit_predict(model, test_generator, MODEL_NAME)
+    acc, report_dict, df_pred = fit_predict(
+        model,
+        val_generator,
+        MODEL_NAME,
+        output_dir=OUTPUT_DIR,
+        fold_name=FOLD_NAME,
+    )
 
     # Plotting
     print("iniciando Plotting Results")
     plots = utils()
 
     plots.plot_training_curves(
-        history, out_png=f"curvas_{MODEL_NAME}.png", title="MobileNetV3 - DeepWeeds"
+        history,
+        out_png=f"curvas_{MODEL_NAME}_{FOLD_NAME}.png",
+        title=f"{MODEL_NAME} - DeepWeeds (Head) - {FOLD_NAME}",
     )
-    plots.save_history_csv(history, out_csv=f"historico_{MODEL_NAME}.csv")
+    plots.save_history_csv(history, out_csv=f"historico_{MODEL_NAME}_{FOLD_NAME}.csv")
     plots.plot_confusion_and_report(
         model,
         val_generator,
         train_generator.class_indices,
-        cm_png=f"cm_{MODEL_NAME}.png",
-        report_txt=f"report_{MODEL_NAME}.txt",
+        cm_png=f"cm_{MODEL_NAME}_{FOLD_NAME}.png",
+        report_txt=f"report_{MODEL_NAME}_{FOLD_NAME}.txt",
         normalize=True,
     )
     plots.plot_training_curves(
         history_ft,
-        out_png=f"curvas_{MODEL_NAME}_finetunning.png",
+        out_png=f"curvas_{MODEL_NAME}_{FOLD_NAME}_finetunning.png",
         title=f"{MODEL_NAME} Tuned- DeepWeeds",
     )
     plots.save_history_csv(
-        history_ft, out_csv=f"historico_{MODEL_NAME}_finetunning.csv"
+        history_ft, out_csv=f"historico_{MODEL_NAME}_{FOLD_NAME}_finetunning.csv"
     )
     joined_dict, df_hist = plots.concat_histories(history, history_ft)
-    df_hist.to_csv(f"historico_{MODEL_NAME}_joined.csv", index=False)
+    df_hist.to_csv(f"historico_{MODEL_NAME}_{FOLD_NAME}_joined.csv", index=False)
     split_epoch = len(history.history.get("accuracy", []))
     plots.plot_history_joined(
         joined_dict,
-        out_png=f"{MODEL_NAME}_head_plus_ft.png",
+        out_png=f"{MODEL_NAME}_{FOLD_NAME}_head_plus_ft.png",
         title=f"{MODEL_NAME} - DeepWeeds (Head + FT)",
         split_epoch=split_epoch,
     )
