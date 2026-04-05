@@ -49,7 +49,7 @@ from tensorflow.keras.applications import efficientnet_v2
 # Utils
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 
 # Mixed Precision - Entra FP16
@@ -138,13 +138,15 @@ def load_split_data(label_dir: str, test_size: float):
         raise
 
     # Train test split
-    df_train, df_val = train_test_split(
+    df_train, df_temp = train_test_split(
         data, test_size=test_size, stratify=data["Label"], random_state=75
     )
-
+    df_val, df_test = train_test_split(
+        df_temp, test_size=0.5, stratify=df_temp["Label"], random_state=75
+    )
     df_train = df_train.reset_index(drop=True)
     df_val = df_val.reset_index(drop=True)
-
+    df_test = df_test.reset_index(drop=True)
     # 2) Classes consistentes (ordenadas)
     classes = sorted(data["Label"].unique().tolist())
 
@@ -155,7 +157,7 @@ def load_split_data(label_dir: str, test_size: float):
         f"({len(df_val)/len(data)*100:.1f}% val)"
     )
 
-    return df_train, df_val, classes
+    return df_train, df_val, df_test, classes
 
 
 def get_backbone(name: str, img_size):
@@ -234,7 +236,7 @@ def get_backbone(name: str, img_size):
 
 
 # 4) Dois datagens - augment só no treino
-def set_generators(preprocess_fn, df_train, df_val, img_size, debbug: bool):
+def set_generators(preprocess_fn, df_train, df_val, df_test, img_size, debbug: bool):
 
     # Augmentation
     train_datagen = ImageDataGenerator(
@@ -251,6 +253,7 @@ def set_generators(preprocess_fn, df_train, df_val, img_size, debbug: bool):
     )
 
     val_datagen = ImageDataGenerator(preprocessing_function=preprocess_fn)
+    test_datagen = ImageDataGenerator(preprocessing_function=preprocess_fn)
 
     # 5) Generators SEM validation_split/subset
     train_generator = train_datagen.flow_from_dataframe(
@@ -275,18 +278,31 @@ def set_generators(preprocess_fn, df_train, df_val, img_size, debbug: bool):
         classes=classes,
         shuffle=False,
     )
+    test_generator = test_datagen.flow_from_dataframe(
+        dataframe=df_test,
+        x_col="Filename",
+        y_col="Label",
+        target_size=img_size,
+        batch_size=BATCH_SIZE,
+        class_mode="categorical",
+        classes=classes,
+        shuffle=False,
+    )
 
     if debbug:
         print(train_generator.class_indices)
         print(val_generator.class_indices)
+        print(test_generator.class_indices)
 
         assert train_generator.class_indices == val_generator.class_indices
         assert set(train_generator.filenames).isdisjoint(set(val_generator.filenames))
+        assert set(train_generator.filenames).isdisjoint(set(test_generator.filenames))
 
         print("[DEBBUG] Distribuição treino:", Counter(train_generator.classes))
         print("[DEBBUG] Distribuição val   :", Counter(val_generator.classes))
+        print("[DEBBUG] Distribuição test  :", Counter(test_generator.classes))
 
-    return train_generator, val_generator
+    return train_generator, val_generator, test_generator
 
 
 def set_transferlearning(base_model):
@@ -310,7 +326,7 @@ def set_transferlearning(base_model):
 
 
 def fit_model(
-    model, train_generator, val_generator, name: str, class_weight: bool, epochs: int
+    model, train_generator, test_generator, name: str, class_weight: bool, epochs: int
 ):
 
     cbs = [
@@ -341,7 +357,7 @@ def fit_model(
 
         history = model.fit(
             train_generator,
-            validation_data=val_generator,
+            validation_data=test_generator,
             epochs=epochs,
             callbacks=cbs,
             class_weight=class_weight,
@@ -351,7 +367,7 @@ def fit_model(
     else:
         history = model.fit(
             train_generator,
-            validation_data=val_generator,
+            validation_data=test_generator,
             epochs=epochs,
             callbacks=cbs,
             verbose=1,
@@ -381,7 +397,7 @@ def set_finetunning(model):
     return model
 
 
-def fit_finetunning(model, train_generator, val_generator, epochs: int, name: str):
+def fit_finetunning(model, train_generator, test_generator, epochs: int, name: str):
     cbs_ft = [
         callbacks.ModelCheckpoint(
             f"best_{name}_finetune.keras",
@@ -405,12 +421,45 @@ def fit_finetunning(model, train_generator, val_generator, epochs: int, name: st
 
     history_ft = model.fit(
         train_generator,
-        validation_data=val_generator,
+        validation_data=test_generator,
         epochs=epochs,
         callbacks=cbs_ft,
         verbose=1,
     )
     return history_ft
+
+
+def set_predict(model_name):
+    model_path = f"best_{model_name}_finetune.keras"
+    print(f"[INFO] Carregando modelo para predição: {model_path}")
+    model = tf.keras.models.load_model(model_path, compile=False)
+    return model
+
+
+def fit_predict(model, val_generator, model_name):
+    print(f"[INFO] Avaliando modelo {model_name} na validação...")
+    y_true = val_generator.classes
+    y_prob = model.predict(val_generator, verbose=0)
+    y_pred = np.argmax(y_prob, axis=1)
+    acc = accuracy_score(y_true, y_pred)
+    report_dict = classification_report(
+        y_true,
+        y_pred,
+        target_names=val_generator.class_indices.keys(),
+        output_dict=True,
+    )
+    print(f"Val Accuracy: {acc:.4f}")
+    print("Classification Report:", report_dict)
+
+    with open(f"report_{model_name}_finetune.txt", "w") as f:
+        f.write(f"Val Accuracy: {acc:.4f}\n")
+        f.write("Classification Report:\n")
+        for label, metrics in report_dict.items():
+            if label in val_generator.class_indices.keys():
+                f.write(f"{label}:\n")
+                for metric_name, metric_value in metrics.items():
+                    f.write(f"  {metric_name}: {metric_value:.4f}\n")
+    return acc, report_dict
 
 
 # Ajusta img_size pelo modelo
@@ -431,18 +480,18 @@ if __name__ == "__main__":
     print(f"[INFO] IMG_SIZE De {MODEL_NAME} Ajustado para: {IMG_SIZE}")
 
     # Training
-    df_train, df_val, classes = load_split_data(
+    df_train, df_val, df_test, classes = load_split_data(
         label_dir=LABEL_DIR, test_size=TEST_SIZE
     )
     preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
-    train_generator, val_generator = set_generators(
-        preprocess_fn, df_train, df_val, IMG_SIZE, debbug=True
+    train_generator, val_generator, test_generator = set_generators(
+        preprocess_fn, df_train, df_val, df_test, IMG_SIZE, debbug=True
     )
     model = set_transferlearning(base_model)
     history = fit_model(
         model,
         train_generator,
-        val_generator,
+        test_generator,
         name=MODEL_NAME,
         class_weight=False,
         epochs=TRAINING_EPOCHS,
@@ -451,10 +500,13 @@ if __name__ == "__main__":
     history_ft = fit_finetunning(
         model,
         train_generator,
-        val_generator,
+        test_generator,
         epochs=FINETUNNING_EPOCHS,
         name=MODEL_NAME,
     )
+
+    model = set_predict(MODEL_NAME)
+    acc, report_dict = fit_predict(model, val_generator, MODEL_NAME)
 
     # Plotting
     print("iniciando Plotting Results")

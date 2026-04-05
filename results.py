@@ -14,8 +14,8 @@ from tensorflow.python.framework.convert_to_constants import (
 
 # Global Paths
 MODELS_PATH = "models/"
-RESULTS_PATH = "results/"
-REPORTS_PATH = "results/reports/"
+RESULTS_PATH = "results_new/"
+REPORTS_PATH = "results_new/"
 
 
 class report:
@@ -46,6 +46,7 @@ class report:
     def list_results(results_dir=REPORTS_PATH):
         results_path = Path(results_dir).resolve()
         results_files = sorted(results_path.glob("*.txt"))
+        print(f"Procurando arquivos de resultados em: {results_path}")
 
         if not results_files:
             raise FileNotFoundError(
@@ -90,7 +91,8 @@ class process_results:
             accuracy = None
             macro = None  # (precision, recall, f1, support)
             weighted = None  # (precision, recall, f1, support)
-
+            print(f"[DEBUG] Processando {path.name} para métricas globais")
+            print("[DEBUG], ", linhas)
             for linha in linhas:
                 partes = linha.split()
 
@@ -104,6 +106,7 @@ class process_results:
                         float(partes[4]),
                         int(partes[5]),
                     )
+                    print(f"[DEBUG] Macro avg encontrado: {macro}")
 
                 if len(partes) == 6 and partes[0] == "weighted" and partes[1] == "avg":
                     weighted = (

@@ -1,0 +1,47 @@
+Val Accuracy: 0.9440
+Classification Report:
+0:
+  precision: 0.8647
+  recall: 0.8750
+  f1-score: 0.8698
+  support: 168.0000
+1:
+  precision: 0.9427
+  recall: 0.9308
+  f1-score: 0.9367
+  support: 159.0000
+2:
+  precision: 0.9481
+  recall: 0.9481
+  f1-score: 0.9481
+  support: 154.0000
+3:
+  precision: 0.9856
+  recall: 0.8896
+  f1-score: 0.9352
+  support: 154.0000
+4:
+  precision: 0.9146
+  recall: 0.9434
+  f1-score: 0.9288
+  support: 159.0000
+5:
+  precision: 0.9474
+  recall: 0.9474
+  f1-score: 0.9474
+  support: 152.0000
+6:
+  precision: 0.9321
+  recall: 0.9379
+  f1-score: 0.9350
+  support: 161.0000
+7:
+  precision: 0.8415
+  recall: 0.9020
+  f1-score: 0.8707
+  support: 153.0000
+8:
+  precision: 0.9663
+  recall: 0.9649
+  f1-score: 0.9656
+  support: 1366.0000

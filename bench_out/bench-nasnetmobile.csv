@@ -1,2 +1,2 @@
 file,path,input_h,input_w,batch,steps,lat_ms_p50,lat_ms_p95,lat_ms_mean,fps_p50,fps_p95,fps_mean,model_key,preprocess_embutido
-best_nasnetmobile_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_nasnetmobile_finetune.keras,224,224,1,200,269.116,273.153,267.946,3.72,3.66,3.73,nasnetmobile,0
+best_nasnetmobile_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_nasnetmobile_finetune.keras,224,224,1,200,280.465,286.073,281.255,3.57,3.5,3.56,nasnetmobile,0

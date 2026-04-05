@@ -1,2 +1,2 @@
 file,path,input_h,input_w,batch,steps,lat_ms_p50,lat_ms_p95,lat_ms_mean,fps_p50,fps_p95,fps_mean,model_key,preprocess_embutido
-best_efficientnetv2b3_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b3_finetune.keras,300,300,1,200,198.005,204.226,202.375,5.05,4.9,4.94,efficientnetv2b3,1
+best_efficientnetv2b3_finetune.keras,/home/leo/Documentos/mestrado/DeepWeeds-Mobile/models/best_efficientnetv2b3_finetune.keras,300,300,1,200,205.539,211.049,210.359,4.87,4.74,4.75,efficientnetv2b3,1
