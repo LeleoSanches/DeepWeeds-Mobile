@@ -2,6 +2,9 @@ import os
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import argparse
 from pathlib import Path
@@ -376,9 +379,9 @@ def fit_model(
             monitor="val_loss", factor=0.5, patience=16, min_lr=1e-6
         ),
         callbacks.EarlyStopping(
-            monitor="val_accuracy",
-            patience=16,
-            # min_delta=0.002,
+            monitor="val_loss",
+            patience=32,
+            min_delta=0,
             restore_best_weights=True,
             mode="max",
         ),
@@ -448,10 +451,10 @@ def fit_finetunning(
         ),
         callbacks.CSVLogger(f"finetune_log{name}_{fold}.csv", append=False),
         callbacks.EarlyStopping(
-            monitor="val_accuracy",
+            monitor="val_loss",
             mode="max",
-            patience=8,
-            # min_delta=0.001,
+            patience=16,
+            min_delta=0,
             restore_best_weights=True,
         ),
         callbacks.TensorBoard(log_dir="tb_logs_finetune", update_freq="epoch"),
@@ -672,3 +675,7 @@ if __name__ == "__main__":
         title=f"{MODEL_NAME} - DeepWeeds (Head + FT)",
         split_epoch=split_epoch,
     )
+    try:
+        plt.close("all")
+    except:
+        pass
