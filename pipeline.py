@@ -65,10 +65,9 @@ print("GPUs visíveis:", tf.config.list_physical_devices("GPU"))
 
 # Global - Path, cooldown=2s
 DIRS = get_project_dirs()
-IMG_DIR = str(DIRS["images"]) + "/"
 RESULTS_DIR = str(DIRS["results"]) + "/"
 MODELS_DIR = str(DIRS["models"]) + "/"
-LABEL_DIR = str(DIRS["labels"]) + "/"
+
 OUTPUT_DIR = RESULTS_DIR
 
 # Global - Parâmetros
@@ -147,10 +146,19 @@ def build_argparser():
         type=int,
         help="Número de épocas para fine-tuning. (padrão: %(default)s)",
     )
+    parser.add_argument(
+        "--dataset",
+        "-d",
+        default="deepweeds",
+        type=str,
+        help="Dataset a utilizar. Opções: deepweeds & weed6c (padrão: %(default)s)",
+    )
     return parser
 
 
-def load_split_data(label_dir: str, fold: str = "fold_1"):
+def load_split_data(
+    label_dir: str, fold: str = "fold_1", dataset_name: str = "deepweeds"
+):
     fold_path = Path(label_dir) / fold
 
     if not fold_path.exists():
@@ -591,6 +599,16 @@ if __name__ == "__main__":
     BATCH_SIZE = int(args.batch_size)
     TRAINING_EPOCHS = int(args.training_epochs)
     FINETUNNING_EPOCHS = int(args.finetunning_epochs)
+    DATASET_NAME = str(args.dataset)
+
+    if DATASET_NAME.lower() == "deepweeds":
+        LABEL_DIR = str(DIRS["labels"]) + "/deepweeds"
+        IMG_DIR = str(DIRS["images"]) + "/deepweeds"
+    elif DATASET_NAME.lower() == "weed6c":
+        LABEL_DIR = str(DIRS["labels"]) + "/weed6c"
+        IMG_DIR = str(DIRS["images"]) + "/weed6c"
+    else:
+        raise ValueError(f"Dataset não suportado: {DATASET_NAME}")
 
     print(f"[INFO] Modelo selecionado: {MODEL_NAME}")
     IMG_SIZE = auto_img_size(MODEL_NAME)
@@ -598,7 +616,7 @@ if __name__ == "__main__":
 
     # Training
     df_train, df_val, df_test, classes = load_split_data(
-        label_dir=LABEL_DIR, fold=FOLD_NAME
+        label_dir=LABEL_DIR, fold=FOLD_NAME, dataset_name=DATASET_NAME
     )
     preprocess_fn, base_model = get_backbone(name=MODEL_NAME, img_size=IMG_SIZE)
     train_generator, val_generator, test_generator = set_generators(

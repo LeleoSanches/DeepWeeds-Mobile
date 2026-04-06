@@ -78,8 +78,8 @@ def generate_3fold_datasets(
 
 if __name__ == "__main__":
     generate_3fold_datasets(
-        csv_path="labels/labels.csv",
-        output_dir="labels/",
+        csv_path="labels/weed6c/labels.csv",
+        output_dir="labels/weed6c/folds",
         label_col="Label",
         random_state=77,
         val_size=0.2,
